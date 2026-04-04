@@ -25,7 +25,8 @@ const pcbGame = (() => {
     const challenges = [
         {
             name: 'LED Circuit',
-            required: ['battery', 'resistor', 'led', 'switch'],
+            // required order MUST match checklist text order (first N items)
+            required: ['battery', 'switch', 'resistor', 'led'],
             connections: [
                 ['battery:0', 'switch:0'],
                 ['switch:1', 'resistor:0'],
@@ -38,7 +39,8 @@ const pcbGame = (() => {
         },
         {
             name: 'Sensor Module',
-            required: ['battery', 'resistor', 'resistor', 'potentiometer', 'led', 'transistor'],
+            // Checklist: battery, potentiometer, transistor, resistor, LED
+            required: ['battery', 'potentiometer', 'transistor', 'resistor', 'led'],
             connections: [
                 ['battery:0', 'potentiometer:0'],
                 ['potentiometer:1', 'transistor:1'],
@@ -53,7 +55,8 @@ const pcbGame = (() => {
         },
         {
             name: 'Audio Amplifier',
-            required: ['battery', 'ic', 'resistor', 'resistor', 'capacitor', 'capacitor'],
+            // Checklist: IC, battery, capacitor, capacitor, resistor (x2)
+            required: ['ic', 'battery', 'capacitor', 'capacitor', 'resistor'],
             connections: [
                 ['battery:0', 'ic:0'],
                 ['ic:1', 'battery:1'],
@@ -276,33 +279,38 @@ const pcbGame = (() => {
         const ch = challenges[currentChallenge];
         const compTypes = placedComponents.map(c => c.type);
         let done = 0;
-        const halfCount = Math.ceil(ch.checklist.length / 2);
+        const reqCount = ch.required.length;
 
-        // First half: component placement
-        for (let i = 0; i < halfCount; i++) {
+        // Component placement checks (first reqCount items in checklist)
+        // For each required[i], count how many of that type are needed up to index i
+        // and check if enough of that type are placed
+        for (let i = 0; i < reqCount; i++) {
             const el = document.getElementById(`pcb-check-${i}`);
-            if (el && i < ch.required.length) {
-                const reqSlice = ch.required.slice(0, i + 1);
-                const placed = reqSlice.every((r, ri) => compTypes.filter(t => t === r).length > reqSlice.filter(t => t === r).length - 1 || compTypes.includes(r));
-                if (compTypes.filter(t => t === ch.required[i]).length > 0) {
-                    el.classList.add('done');
-                    el.querySelector('.check-mark').textContent = '\u2713';
-                    done++;
-                } else {
-                    el.classList.remove('done');
-                    el.querySelector('.check-mark').textContent = '';
-                }
-            }
-        }
-
-        // Second half: connections
-        for (let i = halfCount; i < ch.checklist.length; i++) {
-            const el = document.getElementById(`pcb-check-${i}`);
-            if (el && traces.length > i - halfCount) {
+            if (!el) continue;
+            const reqType = ch.required[i];
+            // How many of this type are needed in required[0..i]?
+            const neededSoFar = ch.required.slice(0, i + 1).filter(t => t === reqType).length;
+            // How many of this type are actually placed?
+            const placedOfType = compTypes.filter(t => t === reqType).length;
+            if (placedOfType >= neededSoFar) {
                 el.classList.add('done');
                 el.querySelector('.check-mark').textContent = '\u2713';
                 done++;
-            } else if (el) {
+            } else {
+                el.classList.remove('done');
+                el.querySelector('.check-mark').textContent = '';
+            }
+        }
+
+        // Connection checks (remaining items after reqCount)
+        for (let i = reqCount; i < ch.checklist.length; i++) {
+            const el = document.getElementById(`pcb-check-${i}`);
+            if (!el) continue;
+            if (traces.length > i - reqCount) {
+                el.classList.add('done');
+                el.querySelector('.check-mark').textContent = '\u2713';
+                done++;
+            } else {
                 el.classList.remove('done');
                 el.querySelector('.check-mark').textContent = '';
             }
