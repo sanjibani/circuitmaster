@@ -408,12 +408,24 @@ const pcbGame = (() => {
             drawComponentRealistic(ctx, comp, COMPONENT_TYPES[comp.type], powered);
         });
 
-        // Hover preview (realistic, semi-transparent)
+        // Hover preview (realistic component with visible backing)
         if (tool === 'place' && selectedComponent && hoverPos) {
             const type = COMPONENT_TYPES[selectedComponent];
-            const fakeComp = { type: selectedComponent, x: hoverPos.x, y: hoverPos.y, w: type.w * GRID, h: type.h * GRID,
+            const pw = type.w * GRID, ph = type.h * GRID;
+            const fakeComp = { type: selectedComponent, x: hoverPos.x, y: hoverPos.y, w: pw, h: ph,
                 pins: type.pins.map(p => ({ x: hoverPos.x + p.dx * GRID, y: hoverPos.y + p.dy * GRID })) };
-            ctx.globalAlpha = 0.45;
+            // Backing glow so preview is visible on dark PCB
+            ctx.fillStyle = 'rgba(62,207,113,0.12)';
+            roundRect(ctx, hoverPos.x - 4, hoverPos.y - 4, pw + 8, ph + 8, 6);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(62,207,113,0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+            roundRect(ctx, hoverPos.x - 4, hoverPos.y - 4, pw + 8, ph + 8, 6);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            // Draw realistic component at good visibility
+            ctx.globalAlpha = 0.75;
             drawComponentRealistic(ctx, fakeComp, type, false);
             ctx.globalAlpha = 1;
         }
