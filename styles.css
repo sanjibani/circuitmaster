@@ -1,5 +1,16 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Prevent text selection on interactive game elements */
+.palette-item, .palette-items, .comp-icon, .comp-info, .comp-name, .comp-detail,
+.game-board-container, canvas, .tool-btn, .tab-btn, .btn, .btn-primary, .btn-success,
+.btn-guided, .game-controls, .defect-badge, .check-item, .board-toolbar, .qc-toolbar,
+.score-card, .game-info-panel, .game-layout {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
