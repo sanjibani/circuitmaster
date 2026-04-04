@@ -22,6 +22,22 @@ No installation. No framework. Just open `index.html` and learn by doing.
 
 ---
 
+## 📸 Screenshots
+
+### PCB Design Lab
+![PCB Design Lab](screenshots/pcb-design-lab.png)
+
+### Smartphone Assembly Line
+![Phone Assembly](screenshots/phone-assembly.png)
+
+### SMT Pick & Place
+![SMT Pick & Place](screenshots/smt-pick-place.png)
+
+### QC Inspector
+![QC Inspector](screenshots/qc-inspector.png)
+
+---
+
 ## 🕹️ Games & Modules
 
 ### 1. 🔌 PCB Design Lab *(Intermediate)*
