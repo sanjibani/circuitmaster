@@ -200,6 +200,14 @@ const qcGame = (() => {
 
         // Beginner mode click handling
         if (beginnerMode) {
+            // Check if "Skip to Inspection" button was clicked
+            if (canvas._beginnerSkipBtn) {
+                const s = canvas._beginnerSkipBtn;
+                if (pos.x >= s.x && pos.x <= s.x + s.w && pos.y >= s.y && pos.y <= s.y + s.h) {
+                    skipToInspection();
+                    return;
+                }
+            }
             // Check if "Next" button was clicked
             if (canvas._beginnerBtn) {
                 const b = canvas._beginnerBtn;
@@ -600,6 +608,17 @@ const qcGame = (() => {
         loadLevel(0);
     }
 
+    // Skip the whole beginner flow and jump to Level 1 inspection immediately
+    function skipToInspection() {
+        beginnerMode = false;
+        canvas._beginnerBtn = null;
+        canvas._beginnerSkipBtn = null;
+        // Switch dropdown to Level 1 so UI stays in sync
+        const sel = document.getElementById('qc-level');
+        if (sel) sel.value = '0';
+        loadLevel(0);
+    }
+
     function beginnerNext() {
         if (beginnerPhase === 'learn') {
             beginnerDefectIdx++;
@@ -769,17 +788,28 @@ const qcGame = (() => {
         ctx.fillStyle = '#c8d4e0'; ctx.font = '12px Inter,sans-serif';
         wrapText(ctx, lesson.whyBad, textX, textY + 128, maxW, 16);
 
-        // Next button (drawn on canvas)
-        const btnW = 140, btnH = 36;
+        // Next button (primary — advance to next defect or start quiz)
+        const btnW = 150, btnH = 36;
         const btnX = w / 2 - btnW / 2, btnY = h - 50;
         ctx.fillStyle = '#3ecf71';
         roundRect(ctx, btnX, btnY, btnW, btnH, 8); ctx.fill();
         ctx.fillStyle = '#0f1117'; ctx.font = 'bold 14px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(beginnerDefectIdx < BEGINNER_LESSONS.length - 1 ? 'Next Defect →' : 'Start Quiz →', w / 2, btnY + btnH / 2);
+
+        // Skip button (secondary — jump straight to real inspection, no quiz)
+        const skipW = 140;
+        const skipX = btnX + btnW + 12, skipY = btnY;
+        ctx.fillStyle = 'rgba(122,139,165,0.15)';
+        roundRect(ctx, skipX, skipY, skipW, btnH, 8); ctx.fill();
+        ctx.strokeStyle = 'rgba(122,139,165,0.5)'; ctx.lineWidth = 1;
+        roundRect(ctx, skipX, skipY, skipW, btnH, 8); ctx.stroke();
+        ctx.fillStyle = '#c8d4e0'; ctx.font = '12px Inter,sans-serif';
+        ctx.fillText('Skip to Inspection ⏭', skipX + skipW / 2, skipY + btnH / 2);
         ctx.textBaseline = 'alphabetic';
 
         // Store button bounds for click handling
         canvas._beginnerBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
+        canvas._beginnerSkipBtn = { x: skipX, y: skipY, w: skipW, h: btnH };
     }
 
     function drawGoodExample(ctx, cardX, cardY, cardW, cardH, defectIdx) {
@@ -952,6 +982,19 @@ const qcGame = (() => {
         roundRect(ctx, w / 2 - 160, 4, 320, 30, 8); ctx.fill();
         ctx.fillStyle = '#4db8ff'; ctx.font = 'bold 13px Inter,sans-serif'; ctx.textAlign = 'center';
         ctx.fillText(`🧪 Find the ${BEGINNER_LESSONS[beginnerStep].title}`, w / 2, 24);
+
+        // Skip button (top-right — always available during quiz)
+        const skipW = 140, skipH = 26;
+        const skipX = w - skipW - 12, skipY = 8;
+        ctx.fillStyle = 'rgba(15,17,23,0.85)';
+        roundRect(ctx, skipX, skipY, skipW, skipH, 6); ctx.fill();
+        ctx.strokeStyle = 'rgba(122,139,165,0.5)'; ctx.lineWidth = 1;
+        roundRect(ctx, skipX, skipY, skipW, skipH, 6); ctx.stroke();
+        ctx.fillStyle = '#c8d4e0'; ctx.font = '11px Inter,sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Skip to Inspection ⏭', skipX + skipW / 2, skipY + skipH / 2);
+        ctx.textBaseline = 'alphabetic';
+        canvas._beginnerSkipBtn = { x: skipX, y: skipY, w: skipW, h: skipH };
 
         // Magnify effect
         if (tool === 'magnify' && hoverPos) {
