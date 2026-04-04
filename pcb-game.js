@@ -150,9 +150,16 @@ const pcbGame = (() => {
         tool = t;
         traceStart = null;
         tracePoints = [];
+        // Clear component selection when switching away from place mode
+        // so hovering/clicking won't accidentally place a component
+        if (t !== 'place') {
+            selectedComponent = null;
+            document.querySelectorAll('#pcb-components .palette-item').forEach(p => p.classList.remove('selected'));
+        }
         document.querySelectorAll('.board-toolbar .tool-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.board-toolbar .tool-btn[data-tool="${t}"]`)?.classList.add('active');
         canvas.style.cursor = t === 'trace' ? 'crosshair' : t === 'delete' ? 'not-allowed' : 'pointer';
+        draw();
     }
 
     function setupEvents() {
@@ -187,6 +194,17 @@ const pcbGame = (() => {
         const pos = getCanvasCoords(canvas, e);
         const gx = snapToGrid(pos.x, GRID);
         const gy = snapToGrid(pos.y, GRID);
+
+        // Auto-switch to trace mode if clicking near a pin while in place mode
+        // This makes connecting intuitive — just click a green dot to start wiring
+        if (tool === 'place') {
+            const nearPin = findNearestPin(gx, gy);
+            if (nearPin) {
+                setTool('trace');
+                // Fall through to trace handling below
+                tool = 'trace';
+            }
+        }
 
         if (tool === 'place' && selectedComponent) {
             const comp = COMPONENT_TYPES[selectedComponent];
@@ -457,15 +475,22 @@ const pcbGame = (() => {
             }
         }
 
-        // Pin highlight on hover in trace mode
-        if (tool === 'trace' && hoverPos) {
+        // Pin highlight on hover — show in ALL modes so pins are always interactive
+        if (hoverPos) {
             const pin = findNearestPin(hoverPos.x, hoverPos.y);
             if (pin) {
                 ctx.beginPath();
-                ctx.arc(pin.x, pin.y, 8, 0, Math.PI * 2);
-                ctx.strokeStyle = '#00e676';
+                ctx.arc(pin.x, pin.y, 9, 0, Math.PI * 2);
+                ctx.strokeStyle = tool === 'trace' ? '#00e676' : 'rgba(0,230,118,0.5)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
+                // "Click to wire" hint when hovering a pin in non-trace mode
+                if (tool !== 'trace') {
+                    ctx.fillStyle = 'rgba(0,230,118,0.75)';
+                    ctx.font = '9px Inter,sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('click to wire', pin.x, pin.y - 14);
+                }
             }
         }
     }
