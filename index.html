@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CircuitMaster India - Electronics Manufacturing Training</title>
-    <link rel="stylesheet" href="styles.css?v=10">
-    <link rel="stylesheet" href="tutorial-styles.css?v=10">
+    <link rel="stylesheet" href="styles.css?v=11">
+    <link rel="stylesheet" href="tutorial-styles.css?v=11">
 </head>
 <body>
     <header class="main-header">
@@ -184,7 +184,8 @@
             <h2>Quality Control Inspector</h2>
             <p class="game-desc">Inspect PCBs and assemblies for defects. Find all issues before they ship! Miss a defect and it costs the company.</p>
             <div class="game-controls">
-                <select id="qc-level" onchange="qcGame.loadLevel(this.value)">
+                <select id="qc-level" onchange="if(this.value==='beginner'){qcGame.startBeginnerMode()}else{qcGame.loadLevel(this.value)}">
+                    <option value="beginner">🎓 Learn: What are Defects?</option>
                     <option value="0">Level 1: Obvious Defects</option>
                     <option value="1">Level 2: Subtle Issues</option>
                     <option value="2">Level 3: Expert Mode</option>
@@ -283,13 +284,13 @@
         </div>
     </div>
 
-    <script src="app.js?v=10"></script>
-    <script src="pcb-game.js?v=10"></script>
-    <script src="assembly-game.js?v=10"></script>
-    <script src="smt-game.js?v=10"></script>
-    <script src="qc-game.js?v=10"></script>
-    <script src="tutorial-flows.js?v=10"></script>
-    <script src="tutorial-engine.js?v=10"></script>
+    <script src="app.js?v=11"></script>
+    <script src="pcb-game.js?v=11"></script>
+    <script src="assembly-game.js?v=11"></script>
+    <script src="smt-game.js?v=11"></script>
+    <script src="qc-game.js?v=11"></script>
+    <script src="tutorial-flows.js?v=11"></script>
+    <script src="tutorial-engine.js?v=11"></script>
     <script>
         // Initialize all games
         document.addEventListener('DOMContentLoaded', () => {
