@@ -162,22 +162,48 @@ const pcbGame = (() => {
         draw();
     }
 
+    // Distance from point to line segment — used for trace hit-testing
+    function pointToSegmentDist(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    // Find index of the trace nearest to (px, py) within threshold pixels
+    function findTraceAt(px, py, threshold = 10) {
+        for (let i = 0; i < traces.length; i++) {
+            const pts = traces[i].points;
+            for (let j = 0; j < pts.length - 1; j++) {
+                if (pointToSegmentDist(px, py, pts[j].x, pts[j].y, pts[j + 1].x, pts[j + 1].y) < threshold) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    function deleteAtPos(px, py) {
+        // Try component first
+        const idx = placedComponents.findIndex(c =>
+            px >= c.x && px <= c.x + c.w && py >= c.y && py <= c.y + c.h
+        );
+        if (idx >= 0) { placedComponents.splice(idx, 1); updateChecklist(); draw(); return true; }
+        // Then trace — check along line segments, not just vertices
+        const tIdx = findTraceAt(px, py);
+        if (tIdx >= 0) { traces.splice(tIdx, 1); updateChecklist(); draw(); return true; }
+        return false;
+    }
+
     function setupEvents() {
         canvas.addEventListener('click', handleClick);
         canvas.addEventListener('mousemove', handleMove);
         canvas.addEventListener('contextmenu', e => {
             e.preventDefault();
-            // Right-click-to-delete shortcut (any tool mode)
             const pos = getCanvasCoords(canvas, e);
-            const gx = snapToGrid(pos.x, GRID), gy = snapToGrid(pos.y, GRID);
-            const idx = placedComponents.findIndex(c =>
-                gx >= c.x && gx <= c.x + c.w && gy >= c.y && gy <= c.y + c.h
-            );
-            if (idx >= 0) { placedComponents.splice(idx, 1); updateChecklist(); draw(); return; }
-            const tIdx = traces.findIndex(t =>
-                t.points.some(p => Math.abs(p.x - gx) < GRID && Math.abs(p.y - gy) < GRID)
-            );
-            if (tIdx >= 0) { traces.splice(tIdx, 1); draw(); }
+            deleteAtPos(pos.x, pos.y);
         });
         window.addEventListener('resize', () => { if (document.getElementById('pcb-design').classList.contains('active')) resizeCanvas(); });
     }
@@ -248,17 +274,10 @@ const pcbGame = (() => {
             }
             draw();
         } else if (tool === 'delete') {
-            // Delete component under cursor
-            const idx = placedComponents.findIndex(c =>
-                gx >= c.x && gx <= c.x + c.w && gy >= c.y && gy <= c.y + c.h
-            );
-            if (idx >= 0) {
-                placedComponents.splice(idx, 1);
-                // Remove traces connected to this component
-                updateChecklist();
-                draw();
-            }
-            // Delete trace near cursor
+            // Delete component or trace under cursor (use raw pos, not snapped)
+            deleteAtPos(pos.x, pos.y);
+            // Legacy block below kept for fallback — will be skipped if already deleted
+            const idx = -1;
             const tIdx = traces.findIndex(t =>
                 t.points.some(p => Math.abs(p.x - gx) < GRID && Math.abs(p.y - gy) < GRID)
             );
@@ -456,7 +475,7 @@ const pcbGame = (() => {
             ctx.globalAlpha = 1;
         }
 
-        // Delete mode: red highlight on hovered component
+        // Delete mode: red highlight on hovered component OR trace
         if (tool === 'delete' && hoverPos) {
             const hc = placedComponents.find(c =>
                 hoverPos.x >= c.x && hoverPos.x <= c.x + c.w && hoverPos.y >= c.y && hoverPos.y <= c.y + c.h);
@@ -467,11 +486,27 @@ const pcbGame = (() => {
                 roundRect(ctx, hc.x - 3, hc.y - 3, hc.w + 6, hc.h + 6, 6);
                 ctx.stroke();
                 ctx.setLineDash([]);
-                // "×" icon
                 ctx.fillStyle = 'rgba(255,82,82,0.85)';
                 ctx.font = 'bold 14px sans-serif';
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText('×', hc.x + hc.w + 4, hc.y - 4);
+            } else {
+                // Trace hover highlight
+                const tIdx = findTraceAt(hoverPos.x, hoverPos.y);
+                if (tIdx >= 0) {
+                    const t = traces[tIdx];
+                    ctx.strokeStyle = '#ff5252';
+                    ctx.lineWidth = 5;
+                    ctx.setLineDash([6, 4]);
+                    ctx.beginPath();
+                    t.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = 'rgba(255,82,82,0.85)';
+                    ctx.font = 'bold 14px sans-serif';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('× click to delete wire', hoverPos.x, hoverPos.y - 14);
+                }
             }
         }
 
