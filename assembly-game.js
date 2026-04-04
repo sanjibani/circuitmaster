@@ -7,6 +7,90 @@ const assemblyGame = (() => {
     let timerInterval = null;
     let elapsedSeconds = 0;
     let selectedPart = null;
+    let hoveredCanvasPart = null;
+    let infoCard = null;
+
+    // ─── Component role descriptions ─────────────────────────────────────────
+    const PART_ROLES = {
+        frame: {
+            emoji: '🔧',
+            role: 'Structural Chassis',
+            what: 'The skeleton of the phone. CNC-machined aluminum or titanium that holds every internal part in exact position and provides rigidity against drops and flex.',
+            fact: 'A flagship frame tolerates up to 400N of compressive force without bending.'
+        },
+        'rugged-frame': {
+            emoji: '🛡️',
+            role: 'Shock-Absorbing Frame',
+            what: 'TPU rubber outer shell that deforms on impact to absorb kinetic energy before it reaches the internals — like a crumple zone in a car.',
+            fact: 'Rated for 1.8m drop onto concrete per MIL-STD-810H standard.'
+        },
+        innershield: {
+            emoji: '🛡️',
+            role: 'EMI Shield / Inner Frame',
+            what: 'Metal inner chassis that blocks electromagnetic interference between radio chips and logic circuits, while also sealing out water (IP68) and spreading heat.',
+            fact: 'The metal cage acts as a Faraday shield — blocks signals above ~1 GHz.'
+        },
+        pcb: {
+            emoji: '💻',
+            role: 'Main Logic Board',
+            what: 'The brain of the phone. The SoC (System-on-Chip) processes all computation; DRAM handles active memory; NAND stores your apps and files; PMIC regulates power to every chip.',
+            fact: 'A flagship PCB has up to 12 copper layers and traces finer than a human hair (0.075mm).'
+        },
+        battery: {
+            emoji: '🔋',
+            role: 'Li-Po Power Cell',
+            what: 'Lithium Polymer pouch cell that stores energy via reversible electrochemical reactions. Supplies stable 3.7–4.4V to all components through the PMIC.',
+            fact: 'Li-Po can charge at up to 240W (Xiaomi) — 0→100% in under 10 minutes.'
+        },
+        camera: {
+            emoji: '📷',
+            role: 'CMOS Imaging Sensor',
+            what: 'Millions of photodiodes convert photons to electrons. The multi-ring lens stack focuses light precisely onto the sensor. OIS gyroscopes shift the lens to cancel hand-shake.',
+            fact: '200MP sensors capture more pixels than a 4K TV has — in a 1cm² chip.'
+        },
+        periscope: {
+            emoji: '🔭',
+            role: 'Periscope Telephoto Lens',
+            what: 'A prism bends light 90° into a long folded lens path inside the phone body — giving 5–10× optical zoom without a large camera bump protruding from the back.',
+            fact: 'The folded optical path can be up to 30mm long inside a 7mm thin phone.'
+        },
+        speaker: {
+            emoji: '🔊',
+            role: 'Speaker / Audio Driver',
+            what: 'Electrical audio signals vibrate a voice coil which pushes a membrane, creating pressure waves (sound). The staggered mesh grille protects the membrane from dust.',
+            fact: 'Modern phone speakers can reach 100dB+ — as loud as a power tool at 1m.'
+        },
+        usbc: {
+            emoji: '⚡',
+            role: 'USB-C Charging & Data Port',
+            what: 'Reversible 24-pin connector handling charging (up to 240W), data (USB 3.2 = 20Gbps), video out (DisplayPort), and audio — all through one small oval port.',
+            fact: 'USB-C pins are spaced 0.5mm apart. The connector withstands 10,000+ insertion cycles.'
+        },
+        display: {
+            emoji: '📱',
+            role: 'AMOLED / LTPO Display',
+            what: 'Each pixel has its own OLED emitter — no backlight needed. LTPO transistors vary refresh rate from 1Hz (static image) to 120Hz (fast scrolling) automatically to save power.',
+            fact: 'A 6.8" AMOLED panel has ~2,340×1,080 = ~2.5 million individually controlled pixels.'
+        },
+        glass: {
+            emoji: '✨',
+            role: 'Cover Glass & Touch Digitizer',
+            what: 'Chemically strengthened via ion-exchange (K⁺ ions replace Na⁺, creating compressive stress). Also contains a transparent ITO grid that senses finger capacitance for touch input.',
+            fact: 'Gorilla Glass 7i can survive drops from 1m onto rough surfaces like asphalt.'
+        },
+        nfc: {
+            emoji: '📡',
+            role: 'NFC Coil Antenna',
+            what: 'Flat copper spiral that resonates at 13.56 MHz. Inductively couples with payment terminals, transit card readers, and other NFC devices within ~4cm.',
+            fact: 'NFC transfers up to 424 Kbps — enough for a payment token in under 50ms.'
+        },
+        antenna: {
+            emoji: '📶',
+            role: 'RF Antenna Array',
+            what: 'Thin copper traces tuned to specific wavelengths for 5G (mmWave + Sub-6GHz), Wi-Fi 6E, Bluetooth 5.3, and GPS. Placed away from your hand to avoid signal attenuation.',
+            fact: '5G mmWave antennas (28GHz) are only ~5mm long — shorter than a grain of rice.'
+        },
+    };
 
     const PHONE_MODELS = [
         {
@@ -107,6 +191,16 @@ const assemblyGame = (() => {
                 </div>
             `;
             item.onclick = () => tryPlacePart(part.id);
+
+            // Palette hover → info card
+            item.addEventListener('mouseenter', (e) => {
+                showInfoCard(part, e.clientX, e.clientY);
+            });
+            item.addEventListener('mousemove', (e) => {
+                showInfoCard(part, e.clientX, e.clientY);
+            });
+            item.addEventListener('mouseleave', hideInfoCard);
+
             palette.appendChild(item);
 
             // Draw mini icon after DOM insertion
@@ -241,9 +335,88 @@ const assemblyGame = (() => {
 
     function reset() { loadModel(currentModel); }
 
+    // ─── Info card ────────────────────────────────────────────────────────────
+    function ensureInfoCard() {
+        if (infoCard) return infoCard;
+        infoCard = document.createElement('div');
+        infoCard.id = 'asm-info-card';
+        infoCard.innerHTML = '';
+        document.body.appendChild(infoCard);
+        return infoCard;
+    }
+
+    function showInfoCard(part, x, y) {
+        const card = ensureInfoCard();
+        const info = PART_ROLES[part.shape] || {
+            emoji: '🔩', role: part.name,
+            what: part.detail, fact: ''
+        };
+        card.innerHTML = `
+            <div class="aic-header">
+                <span class="aic-emoji">${info.emoji}</span>
+                <div>
+                    <div class="aic-role">${info.role}</div>
+                    <div class="aic-name">${part.name} · <em>${part.detail}</em></div>
+                </div>
+            </div>
+            <div class="aic-what">${info.what}</div>
+            ${info.fact ? `<div class="aic-fact">⚡ ${info.fact}</div>` : ''}
+        `;
+        card.classList.add('visible');
+
+        // Position: keep inside viewport
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const cw = 280, ch = 160;
+        let left = x + 16, top = y - 10;
+        if (left + cw > vw - 12) left = x - cw - 10;
+        if (top + ch > vh - 12) top = vh - ch - 12;
+        if (top < 8) top = 8;
+        card.style.left = left + 'px';
+        card.style.top  = top  + 'px';
+    }
+
+    function hideInfoCard() {
+        if (infoCard) infoCard.classList.remove('visible');
+        hoveredCanvasPart = null;
+    }
+
     function setupEvents() {
         window.addEventListener('resize', () => {
             if (document.getElementById('phone-assembly').classList.contains('active')) resizeCanvas();
+        });
+
+        // Canvas hover — detect placed parts under cursor
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const model = PHONE_MODELS[currentModel];
+            const phoneX = Math.floor((canvas.width  - model.width)  / 2);
+            const phoneY = Math.floor((canvas.height - model.height) / 2);
+
+            let found = null;
+            // Check in reverse so top-most (last drawn) wins
+            for (let i = placedParts.length - 1; i >= 0; i--) {
+                const p = placedParts[i];
+                const px = phoneX + p.x, py = phoneY + p.y;
+                if (mx >= px && mx <= px + p.w && my >= py && my <= py + p.h) {
+                    found = p; break;
+                }
+            }
+            if (found !== hoveredCanvasPart) {
+                hoveredCanvasPart = found;
+                draw(); // redraw to show/hide highlight ring
+            }
+            if (found) {
+                showInfoCard(found, e.clientX, e.clientY);
+            } else {
+                hideInfoCard();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hideInfoCard();
+            if (hoveredCanvasPart) { hoveredCanvasPart = null; draw(); }
         });
     }
 
@@ -284,6 +457,33 @@ const assemblyGame = (() => {
 
         // Placed parts
         placedParts.forEach(part => drawPart(ctx, part, phoneX, phoneY, 1));
+
+        // Hover highlight ring on canvas-hovered placed part
+        if (hoveredCanvasPart) {
+            const hp = hoveredCanvasPart;
+            const hx = phoneX + hp.x - 4, hy = phoneY + hp.y - 4;
+            const hw = hp.w + 8, hh = hp.h + 8;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(62,207,113,0.85)';
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#3ecf71';
+            ctx.shadowBlur = 12;
+            rrPath(ctx, hx, hy, hw, hh, 8);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            // Part name label above highlight
+            const info = PART_ROLES[hp.shape] || {};
+            ctx.fillStyle = 'rgba(15,17,23,0.82)';
+            const labelY = hy - 26;
+            ctx.beginPath();
+            ctx.roundRect(hx, labelY, hw, 22, 5);
+            ctx.fill();
+            ctx.fillStyle = '#3ecf71';
+            ctx.font = 'bold 11px Inter,sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${info.emoji || ''} ${info.role || hp.name}`, hx + hw / 2, labelY + 15);
+            ctx.restore();
+        }
 
         // "Next part" label
         if (currentStep < model.parts.length) {
