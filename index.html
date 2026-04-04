@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CircuitMaster India - Electronics Manufacturing Training</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="tutorial-styles.css?v=5">
+</head>
+<body>
+    <header class="main-header">
+        <div class="logo">
+            <span class="logo-icon">&#9889;</span>
+            <h1>CircuitMaster</h1>
+            <span class="tagline">India Electronics Manufacturing Trainer</span>
+        </div>
+        <div class="stats-bar">
+            <div class="stat"><span class="stat-label">Total XP</span><span class="stat-value" id="total-xp">0</span></div>
+            <div class="stat"><span class="stat-label">Level</span><span class="stat-value" id="player-level">1</span></div>
+            <div class="stat"><span class="stat-label">Games Played</span><span class="stat-value" id="games-played">0</span></div>
+        </div>
+    </header>
+
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="pcb-design" onclick="switchTab('pcb-design')">
+            <span class="tab-icon">&#9783;</span>
+            <span class="tab-label">PCB Design Lab</span>
+            <span class="tab-difficulty">Intermediate</span>
+        </button>
+        <button class="tab-btn" data-tab="phone-assembly" onclick="switchTab('phone-assembly')">
+            <span class="tab-icon">&#128241;</span>
+            <span class="tab-label">Phone Assembly</span>
+            <span class="tab-difficulty">Beginner</span>
+        </button>
+        <button class="tab-btn" data-tab="smt-line" onclick="switchTab('smt-line')">
+            <span class="tab-icon">&#128295;</span>
+            <span class="tab-label">SMT Pick & Place</span>
+            <span class="tab-difficulty">Advanced</span>
+        </button>
+        <button class="tab-btn" data-tab="qc-inspector" onclick="switchTab('qc-inspector')">
+            <span class="tab-icon">&#128269;</span>
+            <span class="tab-label">QC Inspector</span>
+            <span class="tab-difficulty">Beginner</span>
+        </button>
+    </nav>
+
+    <!-- PCB Design Lab -->
+    <section id="pcb-design" class="game-section active">
+        <div class="game-header">
+            <h2>PCB Design Lab</h2>
+            <p class="game-desc">Design a working circuit by placing components on the PCB and routing traces. Match the schematic to earn points!</p>
+            <div class="game-controls">
+                <select id="pcb-challenge" onchange="pcbGame.loadChallenge(this.value)">
+                    <option value="0">Challenge 1: LED Circuit</option>
+                    <option value="1">Challenge 2: Sensor Module</option>
+                    <option value="2">Challenge 3: Audio Amplifier</option>
+                </select>
+                <button class="btn btn-primary" onclick="pcbGame.reset()">Reset Board</button>
+                <button class="btn btn-success" onclick="pcbGame.powerOn()">Power On & Test</button>
+                <button class="btn-guided" onclick="tutorialEngine.showFlowPicker('pcb-design')">GUIDED MODE</button>
+            </div>
+        </div>
+        <div class="game-layout">
+            <div class="component-palette" id="pcb-palette">
+                <h3>Components</h3>
+                <div class="palette-items" id="pcb-components"></div>
+            </div>
+            <div class="game-board-container">
+                <div class="schematic-preview" id="schematic-preview"></div>
+                <canvas id="pcb-canvas" width="800" height="600"></canvas>
+                <div class="board-toolbar">
+                    <button class="tool-btn active" data-tool="place" onclick="pcbGame.setTool('place')">Place</button>
+                    <button class="tool-btn" data-tool="trace" onclick="pcbGame.setTool('trace')">Route Trace</button>
+                    <button class="tool-btn" data-tool="delete" onclick="pcbGame.setTool('delete')">Delete</button>
+                </div>
+            </div>
+            <div class="game-info-panel">
+                <div class="score-card">
+                    <h3>Score</h3>
+                    <div class="score-value" id="pcb-score">0</div>
+                </div>
+                <div class="checklist" id="pcb-checklist"></div>
+                <div class="hints-panel">
+                    <h3>Hints</h3>
+                    <div id="pcb-hints"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Phone Assembly -->
+    <section id="phone-assembly" class="game-section">
+        <div class="game-header">
+            <h2>Smartphone Assembly Line</h2>
+            <p class="game-desc">Assemble a smartphone layer by layer in the correct order. Speed and accuracy both count!</p>
+            <div class="game-controls">
+                <select id="phone-model" onchange="assemblyGame.loadModel(this.value)">
+                    <option value="0">Basic Smartphone</option>
+                    <option value="1">Premium Flagship</option>
+                    <option value="2">Rugged Phone</option>
+                </select>
+                <button class="btn btn-primary" onclick="assemblyGame.reset()">Restart</button>
+                <button class="btn btn-success" onclick="assemblyGame.testPhone()">Power On Test</button>
+                <button class="btn-guided" onclick="tutorialEngine.showFlowPicker('phone-assembly')">GUIDED MODE</button>
+            </div>
+        </div>
+        <div class="game-layout">
+            <div class="component-palette" id="assembly-palette">
+                <h3>Parts Bin</h3>
+                <div class="palette-items" id="assembly-parts"></div>
+            </div>
+            <div class="game-board-container">
+                <canvas id="assembly-canvas" width="800" height="600"></canvas>
+                <div class="assembly-timer">
+                    <span>Time: </span><span id="assembly-time">0:00</span>
+                    <span class="separator">|</span>
+                    <span>Step: </span><span id="assembly-step">0/0</span>
+                </div>
+            </div>
+            <div class="game-info-panel">
+                <div class="score-card">
+                    <h3>Score</h3>
+                    <div class="score-value" id="assembly-score">0</div>
+                </div>
+                <div class="assembly-guide" id="assembly-guide">
+                    <h3>Assembly Guide</h3>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SMT Pick & Place -->
+    <section id="smt-line" class="game-section">
+        <div class="game-header">
+            <h2>SMT Pick & Place Simulator</h2>
+            <p class="game-desc">Apply solder paste, place surface-mount components with precision, then run the reflow oven. Accuracy is everything!</p>
+            <div class="game-controls">
+                <select id="smt-board" onchange="smtGame.loadBoard(this.value)">
+                    <option value="0">Board 1: Simple LED Driver</option>
+                    <option value="1">Board 2: Voltage Regulator</option>
+                    <option value="2">Board 3: Microcontroller Module</option>
+                </select>
+                <button class="btn btn-primary" onclick="smtGame.reset()">Reset</button>
+                <button class="btn btn-warning" onclick="smtGame.nextPhase()">Next Phase</button>
+                <button class="btn-guided" onclick="tutorialEngine.showFlowPicker('smt-line')">GUIDED MODE</button>
+            </div>
+        </div>
+        <div class="game-layout">
+            <div class="component-palette" id="smt-palette">
+                <h3>Component Reel</h3>
+                <div class="palette-items" id="smt-components"></div>
+            </div>
+            <div class="game-board-container">
+                <canvas id="smt-canvas" width="800" height="600"></canvas>
+                <div class="smt-phase-indicator">
+                    <div class="phase" id="phase-paste">1. Solder Paste</div>
+                    <div class="phase" id="phase-place">2. Pick & Place</div>
+                    <div class="phase" id="phase-reflow">3. Reflow Oven</div>
+                    <div class="phase" id="phase-inspect">4. Inspection</div>
+                </div>
+            </div>
+            <div class="game-info-panel">
+                <div class="score-card">
+                    <h3>Accuracy</h3>
+                    <div class="score-value" id="smt-score">100%</div>
+                </div>
+                <div class="smt-stats" id="smt-stats">
+                    <h3>Stats</h3>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- QC Inspector -->
+    <section id="qc-inspector" class="game-section">
+        <div class="game-header">
+            <h2>Quality Control Inspector</h2>
+            <p class="game-desc">Inspect PCBs and assemblies for defects. Find all issues before they ship! Miss a defect and it costs the company.</p>
+            <div class="game-controls">
+                <select id="qc-level" onchange="qcGame.loadLevel(this.value)">
+                    <option value="0">Level 1: Obvious Defects</option>
+                    <option value="1">Level 2: Subtle Issues</option>
+                    <option value="2">Level 3: Expert Mode</option>
+                </select>
+                <button class="btn btn-primary" onclick="qcGame.reset()">New Board</button>
+                <button class="btn btn-success" onclick="qcGame.submitInspection()">Submit Report</button>
+                <button class="btn-guided" onclick="tutorialEngine.showFlowPicker('qc-inspector')">GUIDED MODE</button>
+            </div>
+        </div>
+        <div class="game-layout">
+            <div class="defect-types" id="qc-defect-types">
+                <h3>Defect Types</h3>
+            </div>
+            <div class="game-board-container">
+                <canvas id="qc-canvas" width="800" height="600"></canvas>
+                <div class="qc-toolbar">
+                    <button class="tool-btn active" data-tool="magnify" onclick="qcGame.setTool('magnify')">Magnify</button>
+                    <button class="tool-btn" data-tool="flag" onclick="qcGame.setTool('flag')">Flag Defect</button>
+                    <button class="tool-btn" data-tool="clear" onclick="qcGame.setTool('clear')">Clear Flag</button>
+                </div>
+            </div>
+            <div class="game-info-panel">
+                <div class="score-card">
+                    <h3>Found</h3>
+                    <div class="score-value" id="qc-score">0/0</div>
+                </div>
+                <div class="qc-report" id="qc-report">
+                    <h3>Inspection Report</h3>
+                    <div id="qc-findings"></div>
+                </div>
+                <div class="qc-timer">
+                    <span>Time Left: </span><span id="qc-time">2:00</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Result Modal -->
+    <div class="modal-overlay" id="result-modal">
+        <div class="modal">
+            <div class="modal-header" id="modal-header">
+                <h2 id="modal-title">Results</h2>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal()">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial Step Bar -->
+    <div id="tutorial-step-bar" class="tutorial-step-bar">
+        <div class="tutorial-title"></div>
+        <div class="tutorial-dots"></div>
+        <button class="tutorial-exit-btn" onclick="tutorialEngine.stopFlow()">Exit Tutorial</button>
+    </div>
+
+    <!-- Tutorial Tooltip -->
+    <div id="tutorial-tooltip" class="tutorial-tooltip">
+        <span class="tooltip-step"></span>
+        <div class="tooltip-instruction"></div>
+        <div class="tooltip-detail"></div>
+        <div class="tooltip-arrow"></div>
+    </div>
+
+    <!-- Tutorial Flow Picker -->
+    <div id="tutorial-flow-picker" class="tutorial-flow-picker" onclick="if(event.target===this)tutorialEngine.hideFlowPicker()">
+        <div class="flow-picker-content">
+            <div class="flow-picker-header">
+                <h2>Choose a Tutorial</h2>
+                <p>Follow step-by-step guided flows to learn the game</p>
+            </div>
+            <div class="flow-picker-body"></div>
+            <div class="flow-picker-footer">
+                <button class="flow-picker-close" onclick="tutorialEngine.hideFlowPicker()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial Completion -->
+    <div id="tutorial-complete" class="tutorial-complete-overlay" onclick="if(event.target===this)tutorialEngine.hideCompletion()">
+        <div class="tutorial-complete-card">
+            <div class="complete-header">
+                <div class="complete-icon">&#127942;</div>
+                <h2>Tutorial Complete!</h2>
+                <p class="complete-flow-name"></p>
+            </div>
+            <div class="complete-body">
+                <div class="complete-xp">+200 XP</div>
+                <div class="complete-message"></div>
+            </div>
+            <div class="complete-actions">
+                <button class="btn btn-primary" onclick="tutorialEngine.tryAnotherFlow()">Try Another Flow</button>
+                <button class="btn btn-success" onclick="tutorialEngine.hideCompletion()">Play Freely</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=6"></script>
+    <script src="pcb-game.js?v=6"></script>
+    <script src="assembly-game.js?v=6"></script>
+    <script src="smt-game.js?v=6"></script>
+    <script src="qc-game.js?v=6"></script>
+    <script src="tutorial-flows.js?v=6"></script>
+    <script src="tutorial-engine.js?v=6"></script>
+    <script>
+        // Initialize all games
+        document.addEventListener('DOMContentLoaded', () => {
+            pcbGame.init();
+            assemblyGame.init();
+            smtGame.init();
+            qcGame.init();
+        });
+    </script>
+</body>
+</html>

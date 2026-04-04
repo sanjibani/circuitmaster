@@ -1,0 +1,526 @@
+/* Tutorial Overlay System - CircuitMaster Theme */
+
+/* Step bar at top */
+.tutorial-step-bar {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--accent-green);
+    z-index: 1001;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+}
+
+.tutorial-step-bar.active {
+    display: flex;
+}
+
+.tutorial-step-bar .tutorial-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    min-width: 160px;
+}
+
+.tutorial-step-bar .tutorial-title .tutorial-badge {
+    display: inline-block;
+    background: var(--accent-green);
+    color: #0f1117;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 8px;
+    letter-spacing: 1.2px;
+    vertical-align: middle;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.tutorial-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex: 1;
+    justify-content: center;
+}
+
+.tutorial-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border-color);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.tutorial-dot.completed {
+    background: var(--accent-green);
+    box-shadow: 0 0 6px var(--accent-green-glow);
+}
+
+.tutorial-dot.active {
+    background: var(--accent-green);
+    box-shadow: 0 0 10px var(--accent-green-glow);
+    transform: scale(1.3);
+}
+
+.tutorial-dot.active::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent-green);
+    animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 0.2; }
+}
+
+.tutorial-exit-btn {
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--accent-red);
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.tutorial-exit-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Tooltip */
+.tutorial-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    max-width: 320px;
+    min-width: 220px;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-green);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 1px rgba(62, 207, 113, 0.3);
+    animation: tooltipIn 0.25s ease;
+    pointer-events: none;
+}
+
+.tutorial-tooltip.active {
+    display: block;
+}
+
+@keyframes tooltipIn {
+    from { transform: translateY(6px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.tutorial-tooltip .tooltip-step {
+    display: inline-block;
+    background: var(--accent-green);
+    color: #0f1117;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+}
+
+.tutorial-tooltip .tooltip-instruction {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    line-height: 1.3;
+}
+
+.tutorial-tooltip .tooltip-detail {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.tutorial-tooltip .tooltip-arrow {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-green);
+    transform: rotate(45deg);
+    border-top: none;
+    border-left: none;
+}
+
+.tutorial-tooltip .tooltip-arrow.arrow-bottom {
+    bottom: -7px;
+    left: 50%;
+    margin-left: -6px;
+}
+
+.tutorial-tooltip .tooltip-arrow.arrow-top {
+    top: -7px;
+    left: 50%;
+    margin-left: -6px;
+    border: 1px solid var(--accent-green);
+    border-bottom: none;
+    border-right: none;
+}
+
+.tutorial-tooltip .tooltip-arrow.arrow-left {
+    left: -7px;
+    top: 50%;
+    margin-top: -6px;
+    border: 1px solid var(--accent-green);
+    border-top: none;
+    border-right: none;
+}
+
+/* Pulsing highlight for DOM elements */
+.tutorial-pulse {
+    position: relative;
+    z-index: 10;
+}
+
+.tutorial-pulse::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border: 1.5px solid var(--accent-green);
+    border-radius: var(--radius-sm);
+    animation: tutorialPulseRing 1.2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 100;
+}
+
+@keyframes tutorialPulseRing {
+    0%, 100% {
+        box-shadow: 0 0 4px var(--accent-green-glow), inset 0 0 4px rgba(62, 207, 113, 0.05);
+    }
+    50% {
+        box-shadow: 0 0 16px var(--accent-green-glow), 0 0 32px rgba(62, 207, 113, 0.08), inset 0 0 8px rgba(62, 207, 113, 0.08);
+    }
+}
+
+/* Canvas highlight overlay */
+.tutorial-highlight-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: calc(100% - 38px);
+    pointer-events: none;
+    z-index: 50;
+}
+
+/* Flow Picker Modal */
+.tutorial-flow-picker {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1002;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+.tutorial-flow-picker.show {
+    display: flex;
+}
+
+.flow-picker-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 520px;
+    max-width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-elevated);
+    animation: modalIn 0.3s ease;
+}
+
+.flow-picker-header {
+    padding: 22px 24px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.flow-picker-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent-green);
+    letter-spacing: -0.3px;
+}
+
+.flow-picker-header p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.flow-picker-body {
+    padding: 14px;
+}
+
+.flow-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    margin-bottom: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.flow-card:hover {
+    border-color: var(--accent-green);
+    background: rgba(62, 207, 113, 0.04);
+    transform: translateY(-1px);
+    box-shadow: var(--glow-green);
+}
+
+.flow-card .flow-number {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 800;
+    flex-shrink: 0;
+    border: 1px solid rgba(62, 207, 113, 0.2);
+}
+
+.flow-card .flow-number.completed {
+    background: var(--accent-green);
+    color: #0f1117;
+    border-color: var(--accent-green);
+}
+
+.flow-card .flow-info { flex: 1; }
+
+.flow-card .flow-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+
+.flow-card .flow-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.flow-card .flow-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.flow-card .flow-meta span {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--accent-green);
+    background: var(--accent-green-dim);
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.3px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.flow-picker-footer {
+    padding: 14px 24px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.flow-picker-close {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 7px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.flow-picker-close:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
+/* Completion Screen */
+.tutorial-complete-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 1002;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+
+.tutorial-complete-overlay.show {
+    display: flex;
+}
+
+.tutorial-complete-card {
+    background: var(--bg-card);
+    border: 1px solid var(--accent-green);
+    border-radius: var(--radius-lg);
+    width: 420px;
+    max-width: 90%;
+    text-align: center;
+    box-shadow: 0 0 40px var(--accent-green-glow);
+    animation: completePop 0.4s ease;
+    overflow: hidden;
+}
+
+@keyframes completePop {
+    0% { transform: scale(0.85); opacity: 0; }
+    60% { transform: scale(1.03); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.complete-header {
+    padding: 28px 24px 14px;
+    background: linear-gradient(135deg, rgba(62, 207, 113, 0.1), transparent);
+}
+
+.complete-header .complete-icon {
+    font-size: 42px;
+    margin-bottom: 6px;
+}
+
+.complete-header h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-green);
+    letter-spacing: -0.3px;
+}
+
+.complete-header p {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.complete-body {
+    padding: 18px 24px;
+}
+
+.complete-body .complete-xp {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--accent-green);
+    margin: 10px 0;
+    text-shadow: 0 0 20px var(--accent-green-glow);
+}
+
+.complete-body .complete-message {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 14px;
+}
+
+.complete-actions {
+    padding: 14px 24px 22px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.complete-actions .btn {
+    padding: 9px 18px;
+    font-size: 12px;
+}
+
+/* Guided Mode Button */
+.btn-guided {
+    background: var(--accent-green-dim);
+    border: 1px solid rgba(62, 207, 113, 0.3);
+    color: var(--accent-green);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.8px;
+}
+
+.btn-guided:hover {
+    background: rgba(62, 207, 113, 0.18);
+    box-shadow: var(--glow-green);
+    border-color: rgba(62, 207, 113, 0.5);
+}
+
+.btn-guided.active-tutorial {
+    background: var(--accent-green);
+    color: #0f1117;
+}
+
+/* Green flash on step completion */
+.tutorial-step-flash {
+    animation: stepFlash 0.4s ease;
+}
+
+@keyframes stepFlash {
+    0% { box-shadow: 0 0 0 0 rgba(62, 207, 113, 0.7); }
+    50% { box-shadow: 0 0 24px 8px rgba(62, 207, 113, 0.25); }
+    100% { box-shadow: 0 0 0 0 rgba(62, 207, 113, 0); }
+}
+
+/* Adjust main header when tutorial bar is active */
+body.tutorial-active .main-header {
+    margin-top: 48px;
+}
+
+/* Confetti particles for completion */
+.confetti-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1003;
+    overflow: hidden;
+}
+
+.confetti {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    top: -10px;
+    animation: confettiFall 3s ease-in forwards;
+}
+
+@keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
