@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CircuitMaster India - Electronics Manufacturing Training</title>
-    <link rel="stylesheet" href="styles.css?v=7">
-    <link rel="stylesheet" href="tutorial-styles.css?v=7">
+    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="tutorial-styles.css?v=8">
 </head>
 <body>
     <header class="main-header">
@@ -95,9 +95,16 @@
             <p class="game-desc">Assemble a smartphone layer by layer in the correct order. Speed and accuracy both count!</p>
             <div class="game-controls">
                 <select id="phone-model" onchange="assemblyGame.loadModel(this.value)">
-                    <option value="0">Basic Smartphone</option>
-                    <option value="1">Premium Flagship</option>
-                    <option value="2">Rugged Phone</option>
+                    <optgroup label="Generic Models">
+                        <option value="0">Basic Smartphone</option>
+                        <option value="1">Premium Flagship</option>
+                        <option value="2">Rugged Phone</option>
+                    </optgroup>
+                    <optgroup label="Real Phones (2025)">
+                        <option value="3">📱 iPhone 17</option>
+                        <option value="4">🌟 Samsung Galaxy S25 Ultra</option>
+                        <option value="5">🔍 Google Pixel 9 Pro</option>
+                    </optgroup>
                 </select>
                 <button class="btn btn-primary" onclick="assemblyGame.reset()">Restart</button>
                 <button class="btn btn-success" onclick="assemblyGame.testPhone()">Power On Test</button>
@@ -276,13 +283,13 @@
         </div>
     </div>
 
-    <script src="app.js?v=7"></script>
-    <script src="pcb-game.js?v=7"></script>
-    <script src="assembly-game.js?v=7"></script>
-    <script src="smt-game.js?v=7"></script>
-    <script src="qc-game.js?v=7"></script>
-    <script src="tutorial-flows.js?v=7"></script>
-    <script src="tutorial-engine.js?v=7"></script>
+    <script src="app.js?v=8"></script>
+    <script src="pcb-game.js?v=8"></script>
+    <script src="assembly-game.js?v=8"></script>
+    <script src="smt-game.js?v=8"></script>
+    <script src="qc-game.js?v=8"></script>
+    <script src="tutorial-flows.js?v=8"></script>
+    <script src="tutorial-engine.js?v=8"></script>
     <script>
         // Initialize all games
         document.addEventListener('DOMContentLoaded', () => {

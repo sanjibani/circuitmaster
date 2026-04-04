@@ -90,6 +90,30 @@ const assemblyGame = (() => {
             what: 'Thin copper traces tuned to specific wavelengths for 5G (mmWave + Sub-6GHz), Wi-Fi 6E, Bluetooth 5.3, and GPS. Placed away from your hand to avoid signal attenuation.',
             fact: '5G mmWave antennas (28GHz) are only ~5mm long — shorter than a grain of rice.'
         },
+        'dynamic-island': {
+            emoji: '🎯',
+            role: 'Face ID + Dynamic Island',
+            what: 'Pill-shaped cutout housing the TrueDepth camera: a dot projector emitting 30,000 IR dots, an IR camera, and a flood illuminator build a 3D depth map of your face in milliseconds for secure unlock. The surrounding software "island" hosts live activities.',
+            fact: 'Face ID is 20× more secure than Touch ID — 1 in 1,000,000 false-accept rate vs 1 in 50,000.'
+        },
+        taptic: {
+            emoji: '📳',
+            role: 'Taptic Engine',
+            what: 'Linear resonant actuator that moves a weighted mass electromagnetically to produce precise, silent haptic pulses. Fires in under 1ms to simulate button clicks, keyboard taps, and navigation feedback — no buzzy spinning motor.',
+            fact: 'Apple\'s Taptic Engine can distinguish 3 distinct "tap strengths" — light, medium, heavy — each with a different waveform.'
+        },
+        spen: {
+            emoji: '✏️',
+            role: 'S Pen EMR Stylus',
+            what: 'Passive electromagnetic resonance stylus — no battery needed. The WACOM EMR digitizer layer in the display generates a magnetic field; the S Pen\'s coil resonates at its own frequency, letting the screen triangulate position to sub-pixel accuracy.',
+            fact: 'S Pen latency dropped from 45ms (S21) to 2.8ms (S25 Ultra) — faster response than ink from a real pen on paper.'
+        },
+        tempsensor: {
+            emoji: '🌡️',
+            role: 'Infrared Temperature Sensor',
+            what: 'Thermopile array detects infrared radiation emitted by any surface and converts it to temperature readings accurate to ±0.1°C. Can measure skin, food, ambient air, or any object — no contact needed.',
+            fact: 'Pixel 9 Pro\'s sensor received FDA-clearance for body temperature monitoring in several markets.'
+        },
     };
 
     const PHONE_MODELS = [
@@ -140,6 +164,66 @@ const assemblyGame = (() => {
                 { id: 'speaker',     name: 'Loud Speaker',    detail: '110dB Rated',           order: 6, x: 55,  y: 422, w: 130, h: 18,  shape: 'speaker',     color: '#111' },
                 { id: 'display',     name: 'Display Panel',   detail: '6.1" IPS Sunlight',     order: 7, x: 18,  y: 18,  w: 204, h: 408, shape: 'display',     color: '#050e1a' },
                 { id: 'glass',       name: 'Sapphire Glass',  detail: 'Sapphire coated screen',order: 8, x: 0,   y: 0,   w: 240, h: 460, shape: 'glass',       color: 'rgba(160,200,255,0.09)' },
+            ]
+        },
+
+        // ── Real phones ───────────────────────────────────────────────────────
+        {
+            name: 'iPhone 17',
+            width: 215,
+            height: 440,
+            parts: [
+                { id: 'frame',    name: 'Aluminum Frame',      detail: 'Alloy 7000 CNC-machined',        order: 0,  x: 0,   y: 0,   w: 215, h: 440, shape: 'frame',          color: '#b0b8c4' },
+                { id: 'logic',    name: 'A19 Logic Board',     detail: 'TSMC 3nm · 8GB LPDDR5X',        order: 1,  x: 15,  y: 52,  w: 185, h: 148, shape: 'pcb',            color: '#0d2010' },
+                { id: 'battery',  name: 'Battery Pack',        detail: 'Li-Ion 3,561mAh · 25W MagSafe', order: 2,  x: 15,  y: 210, w: 185, h: 172, shape: 'battery',        color: '#1a1a2a' },
+                { id: 'cam_main', name: '48MP Main Camera',    detail: 'Sony IMX903 · f/1.6 · OIS',     order: 3,  x: 130, y: 62,  w: 50,  h: 50,  shape: 'camera',         color: '#0a1018' },
+                { id: 'cam_uw',   name: '12MP Ultra-Wide',     detail: '13mm · f/2.2 · 120° FoV',       order: 4,  x: 130, y: 118, w: 38,  h: 38,  shape: 'camera',         color: '#0a1018' },
+                { id: 'face_id',  name: 'Face ID Module',      detail: 'TrueDepth · Dynamic Island',    order: 5,  x: 68,  y: 9,   w: 79,  h: 18,  shape: 'dynamic-island', color: '#000' },
+                { id: 'taptic',   name: 'Taptic Engine',       detail: 'Linear actuator · haptics',     order: 6,  x: 15,  y: 393, w: 90,  h: 14,  shape: 'taptic',         color: '#606060' },
+                { id: 'speaker',  name: 'Bottom Speaker',      detail: 'Stereo w/ earpiece · Spatial',  order: 7,  x: 65,  y: 420, w: 85,  h: 12,  shape: 'speaker',        color: '#111' },
+                { id: 'usbc',     name: 'USB-C Port',          detail: 'USB 3 · 10Gbps · 25W charging', order: 8,  x: 78,  y: 428, w: 59,  h: 10,  shape: 'usbc',           color: '#555' },
+                { id: 'display',  name: 'Super Retina XDR',    detail: '6.1" OLED 2556×1179 · 2000nit', order: 9,  x: 5,   y: 5,   w: 205, h: 423, shape: 'display',        color: '#030911' },
+                { id: 'glass',    name: 'Ceramic Shield',      detail: 'Nano-ceramic Corning glass',     order: 10, x: 0,   y: 0,   w: 215, h: 440, shape: 'glass',          color: 'rgba(200,220,255,0.09)' },
+            ]
+        },
+
+        {
+            name: 'Samsung Galaxy S25 Ultra',
+            width: 210,
+            height: 460,
+            parts: [
+                { id: 'frame',    name: 'Titanium Frame',      detail: 'Grade 2 armor titanium',         order: 0,  x: 0,   y: 0,   w: 210, h: 460, shape: 'frame',      color: '#8a9aa8' },
+                { id: 'board',    name: 'Main Board',          detail: 'Snapdragon 8 Elite · 4nm TSMC',  order: 1,  x: 14,  y: 48,  w: 182, h: 148, shape: 'pcb',        color: '#0c2210' },
+                { id: 'nfc',      name: 'NFC Antenna',         detail: 'Samsung Pay · Galaxy Ring pair', order: 2,  x: 14,  y: 205, w: 182, h: 22,  shape: 'nfc',        color: '#c05000' },
+                { id: 'battery',  name: 'Battery',             detail: '5,000mAh · 45W · 15W wireless',  order: 3,  x: 14,  y: 235, w: 182, h: 172, shape: 'battery',    color: '#181828' },
+                { id: 'cam_main', name: '200MP Main',          detail: 'ISOCELL HP9 · f/1.7 · OIS',     order: 4,  x: 18,  y: 60,  w: 54,  h: 54,  shape: 'camera',     color: '#08101a' },
+                { id: 'cam_uw',   name: '50MP Ultra-Wide',     detail: 'ISOCELL JN5 · 120° · f/1.9',    order: 5,  x: 80,  y: 60,  w: 40,  h: 40,  shape: 'camera',     color: '#08101a' },
+                { id: 'cam_t3',   name: '10MP 3× Telephoto',   detail: 'f/2.4 · PDAF · OIS',            order: 6,  x: 80,  y: 106, w: 40,  h: 40,  shape: 'camera',     color: '#08101a' },
+                { id: 'cam_p5',   name: '50MP 5× Periscope',   detail: 'ISOCELL HP2 · 111mm eq · OIS',  order: 7,  x: 130, y: 60,  w: 50,  h: 86,  shape: 'periscope',  color: '#08101a' },
+                { id: 'spen',     name: 'S Pen',               detail: '4096 pressure · 0.7mm tip',     order: 8,  x: 0,   y: 392, w: 8,   h: 60,  shape: 'spen',       color: '#1c1c1c' },
+                { id: 'speaker',  name: 'Dolby Atmos Speaker', detail: 'AKG-tuned stereo',               order: 9,  x: 48,  y: 436, w: 114, h: 14,  shape: 'speaker',    color: '#111' },
+                { id: 'usbc',     name: 'USB-C 3.2 Gen 2',     detail: '10Gbps · DP 1.4 · 45W PD',      order: 10, x: 68,  y: 445, w: 74,  h: 12,  shape: 'usbc',       color: '#555' },
+                { id: 'display',  name: 'Dynamic AMOLED 2X',   detail: '6.9" 3088×1440 · 2600nit',      order: 11, x: 5,   y: 5,   w: 200, h: 442, shape: 'display',    color: '#020a12' },
+                { id: 'glass',    name: 'Gorilla Glass Armor 2',detail: 'Anti-reflective · IP68',        order: 12, x: 0,   y: 0,   w: 210, h: 460, shape: 'glass',      color: 'rgba(180,210,255,0.08)' },
+            ]
+        },
+
+        {
+            name: 'Google Pixel 9 Pro',
+            width: 210,
+            height: 440,
+            parts: [
+                { id: 'frame',     name: 'Polished Aluminum',   detail: 'Matte flat-edge chassis',       order: 0,  x: 0,   y: 0,   w: 210, h: 440, shape: 'frame',       color: '#9098a8' },
+                { id: 'board',     name: 'Tensor G4 Board',     detail: 'Samsung 4nm · 16GB LPDDR5X',    order: 1,  x: 14,  y: 50,  w: 182, h: 148, shape: 'pcb',         color: '#102210' },
+                { id: 'battery',   name: 'Battery',             detail: '4,700mAh · 37W · 23W wireless', order: 2,  x: 14,  y: 208, w: 182, h: 175, shape: 'battery',     color: '#1c1c2a' },
+                { id: 'cam_main',  name: '50MP Main Camera',    detail: 'Samsung GN1 · f/1.68 · OIS',   order: 3,  x: 18,  y: 60,  w: 54,  h: 54,  shape: 'camera',      color: '#080f18' },
+                { id: 'cam_uw',    name: '48MP Ultra-Wide',     detail: '126° · f/1.7 · macro AF',       order: 4,  x: 82,  y: 60,  w: 44,  h: 44,  shape: 'camera',      color: '#080f18' },
+                { id: 'cam_tele',  name: '48MP 5× Periscope',   detail: 'f/2.8 · 5× optical · OIS',     order: 5,  x: 136, y: 60,  w: 46,  h: 76,  shape: 'periscope',   color: '#080f18' },
+                { id: 'tempsense', name: 'Temperature Sensor',  detail: 'Infrared skin temp sensor',     order: 6,  x: 136, y: 142, w: 46,  h: 20,  shape: 'tempsensor',  color: '#1a0a00' },
+                { id: 'speaker',   name: 'Stereo Speakers',     detail: 'Tuned by Google · Spatial',     order: 7,  x: 58,  y: 418, w: 94,  h: 12,  shape: 'speaker',     color: '#111' },
+                { id: 'usbc',      name: 'USB-C 3.2',           detail: '10Gbps · DP · 37W charging',    order: 8,  x: 72,  y: 428, w: 66,  h: 10,  shape: 'usbc',        color: '#555' },
+                { id: 'display',   name: 'LTPO OLED Display',   detail: '6.3" 2992×1344 · 3000nit',     order: 9,  x: 5,   y: 5,   w: 200, h: 420, shape: 'display',     color: '#030b12' },
+                { id: 'glass',     name: 'Gorilla Glass Victus 2',detail: 'Front & back protection',     order: 10, x: 0,   y: 0,   w: 210, h: 440, shape: 'glass',       color: 'rgba(180,215,255,0.09)' },
             ]
         }
     ];
@@ -510,19 +594,23 @@ const assemblyGame = (() => {
         const x = ox + part.x, y = oy + part.y, w = part.w, h = part.h;
 
         switch (part.shape) {
-            case 'frame':        drawFrame(ctx, x, y, w, h, part.color, false); break;
-            case 'rugged-frame': drawFrame(ctx, x, y, w, h, part.color, true);  break;
-            case 'innershield':  drawInnerShield(ctx, x, y, w, h, part.color);  break;
-            case 'pcb':          drawPCB(ctx, x, y, w, h, mini);                break;
-            case 'battery':      drawBattery(ctx, x, y, w, h, mini);            break;
-            case 'camera':       drawCamera(ctx, x, y, w, h, false);            break;
-            case 'periscope':    drawCamera(ctx, x, y, w, h, true);             break;
-            case 'speaker':      drawSpeaker(ctx, x, y, w, h);                  break;
-            case 'usbc':         drawUSBC(ctx, x, y, w, h);                     break;
-            case 'display':      drawDisplay(ctx, x, y, w, h);                  break;
-            case 'glass':        drawGlass(ctx, x, y, w, h);                    break;
-            case 'nfc':          drawNFC(ctx, x, y, w, h);                      break;
-            case 'antenna':      drawAntenna(ctx, x, y, w, h);                  break;
+            case 'frame':           drawFrame(ctx, x, y, w, h, part.color, false); break;
+            case 'rugged-frame':    drawFrame(ctx, x, y, w, h, part.color, true);  break;
+            case 'innershield':     drawInnerShield(ctx, x, y, w, h, part.color);  break;
+            case 'pcb':             drawPCB(ctx, x, y, w, h, mini);                break;
+            case 'battery':         drawBattery(ctx, x, y, w, h, mini);            break;
+            case 'camera':          drawCamera(ctx, x, y, w, h, false);            break;
+            case 'periscope':       drawCamera(ctx, x, y, w, h, true);             break;
+            case 'speaker':         drawSpeaker(ctx, x, y, w, h);                  break;
+            case 'usbc':            drawUSBC(ctx, x, y, w, h);                     break;
+            case 'display':         drawDisplay(ctx, x, y, w, h);                  break;
+            case 'glass':           drawGlass(ctx, x, y, w, h);                    break;
+            case 'nfc':             drawNFC(ctx, x, y, w, h);                      break;
+            case 'antenna':         drawAntenna(ctx, x, y, w, h);                  break;
+            case 'dynamic-island':  drawDynamicIsland(ctx, x, y, w, h);            break;
+            case 'taptic':          drawTaptic(ctx, x, y, w, h);                   break;
+            case 'spen':            drawSPen(ctx, x, y, w, h);                     break;
+            case 'tempsensor':      drawTempSensor(ctx, x, y, w, h);               break;
         }
         ctx.restore();
     }
@@ -1147,6 +1235,139 @@ const assemblyGame = (() => {
         ctx.lineWidth = 0.5;
         rrPath(ctx, x, y, w, h, 3);
         ctx.stroke();
+    }
+
+    // ── DYNAMIC ISLAND (Face ID) ─────────────────────────────────────────────
+    function drawDynamicIsland(ctx, x, y, w, h) {
+        const r = h / 2;
+        // Black pill cutout
+        ctx.fillStyle = '#000';
+        rrPath(ctx, x, y, w, h, r);
+        ctx.fill();
+
+        // IR dot projector — grid of tiny dots on left side
+        const dotZoneW = w * 0.35;
+        ctx.fillStyle = 'rgba(120,60,180,0.7)';
+        for (let row = 0; row < 3; row++) {
+            for (let col = 0; col < 5; col++) {
+                ctx.beginPath();
+                ctx.arc(x + 6 + col * (dotZoneW / 5), y + 3 + row * (h / 3.5), 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Camera lens (right side of island)
+        const camCX = x + w - h * 0.62, camCY = y + h / 2;
+        ctx.beginPath(); ctx.arc(camCX, camCY, h * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = '#0d1a2e'; ctx.fill();
+        ctx.beginPath(); ctx.arc(camCX, camCY, h * 0.22, 0, Math.PI * 2);
+        ctx.fillStyle = '#1a3050'; ctx.fill();
+        ctx.beginPath(); ctx.arc(camCX - 1, camCY - 1, h * 0.08, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(100,160,255,0.4)'; ctx.fill();
+
+        // Flood illuminator — small dot right of camera
+        ctx.beginPath(); ctx.arc(x + w - 5, y + h / 2, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,200,100,0.6)'; ctx.fill();
+
+        // Pill outline glow
+        ctx.strokeStyle = 'rgba(80,80,120,0.5)'; ctx.lineWidth = 0.5;
+        rrPath(ctx, x, y, w, h, r); ctx.stroke();
+    }
+
+    // ── TAPTIC ENGINE ─────────────────────────────────────────────────────────
+    function drawTaptic(ctx, x, y, w, h) {
+        // Housing
+        const grd = ctx.createLinearGradient(x, y, x, y + h);
+        grd.addColorStop(0, '#888'); grd.addColorStop(1, '#444');
+        ctx.fillStyle = grd;
+        rrPath(ctx, x, y, w, h, 3); ctx.fill();
+
+        // Coil windings visible through housing
+        ctx.strokeStyle = 'rgba(200,160,30,0.5)';
+        ctx.lineWidth = 1;
+        const coilCount = Math.floor(w / 6);
+        for (let i = 0; i < coilCount; i++) {
+            const cx2 = x + 4 + i * ((w - 8) / coilCount);
+            ctx.beginPath(); ctx.moveTo(cx2, y + 2); ctx.lineTo(cx2, y + h - 2); ctx.stroke();
+        }
+
+        // Moving mass indicator (center block)
+        ctx.fillStyle = 'rgba(150,150,180,0.6)';
+        ctx.fillRect(x + w * 0.3, y + 1, w * 0.4, h - 2);
+
+        // Flex connector tabs
+        ctx.fillStyle = 'rgba(200,160,30,0.7)';
+        ctx.fillRect(x, y + (h - 4) / 2, 5, 4);
+        ctx.fillRect(x + w - 5, y + (h - 4) / 2, 5, 4);
+
+        ctx.strokeStyle = 'rgba(200,200,200,0.2)'; ctx.lineWidth = 0.5;
+        rrPath(ctx, x, y, w, h, 3); ctx.stroke();
+    }
+
+    // ── S PEN ─────────────────────────────────────────────────────────────────
+    function drawSPen(ctx, x, y, w, h) {
+        const r = w / 2;
+        // Stylus body — rounded rectangle (tall and thin)
+        const penGrd = ctx.createLinearGradient(x, y, x + w, y);
+        penGrd.addColorStop(0, '#3a3a3a');
+        penGrd.addColorStop(0.4, '#555');
+        penGrd.addColorStop(1, '#222');
+        ctx.fillStyle = penGrd;
+        rrPath(ctx, x, y, w, h, r); ctx.fill();
+
+        // Clip ridge
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(x + 1.5, y + h * 0.1); ctx.lineTo(x + 1.5, y + h * 0.7); ctx.stroke();
+
+        // Pressure-sensitive tip (bottom pointed nib)
+        ctx.fillStyle = '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(x + 1, y + h - 8);
+        ctx.lineTo(x + w - 1, y + h - 8);
+        ctx.lineTo(x + w / 2, y + h);
+        ctx.closePath(); ctx.fill();
+
+        // Top button
+        ctx.fillStyle = 'rgba(100,100,140,0.6)';
+        ctx.fillRect(x + 1, y + 4, w - 2, 6);
+
+        // Samsung branding line
+        ctx.strokeStyle = 'rgba(100,180,255,0.3)'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(x + 2, y + h * 0.45); ctx.lineTo(x + w - 2, y + h * 0.45); ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(120,120,140,0.4)'; ctx.lineWidth = 0.5;
+        rrPath(ctx, x, y, w, h, r); ctx.stroke();
+    }
+
+    // ── TEMPERATURE SENSOR ────────────────────────────────────────────────────
+    function drawTempSensor(ctx, x, y, w, h) {
+        ctx.fillStyle = '#1a0a00';
+        rrPath(ctx, x, y, w, h, 3); ctx.fill();
+
+        // Thermopile array — grid of tiny sensing elements
+        const cols = 6, rows = 2;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const ex = x + 4 + c * ((w - 8) / cols);
+                const ey = y + 3 + r * ((h - 6) / rows);
+                ctx.fillStyle = `rgba(255,${80 + c * 25},0,${0.4 + c * 0.08})`;
+                ctx.fillRect(ex, ey, (w - 8) / cols - 1, (h - 6) / rows - 1);
+            }
+        }
+
+        // IR window lens
+        ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) * 0.28, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(80,20,0,0.6)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,80,0,0.4)'; ctx.lineWidth = 0.5; ctx.stroke();
+
+        // Label
+        ctx.fillStyle = 'rgba(255,100,30,0.6)'; ctx.font = '5px monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText('IR TEMP', x + w / 2, y + h - 1);
+        ctx.textBaseline = 'alphabetic';
+
+        ctx.strokeStyle = 'rgba(180,60,0,0.35)'; ctx.lineWidth = 0.5;
+        rrPath(ctx, x, y, w, h, 3); ctx.stroke();
     }
 
     // ─── Color helpers ────────────────────────────────────────────────────────
