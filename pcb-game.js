@@ -155,7 +155,20 @@ const pcbGame = (() => {
     function setupEvents() {
         canvas.addEventListener('click', handleClick);
         canvas.addEventListener('mousemove', handleMove);
-        canvas.addEventListener('contextmenu', e => { e.preventDefault(); });
+        canvas.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            // Right-click-to-delete shortcut (any tool mode)
+            const pos = getCanvasCoords(canvas, e);
+            const gx = snapToGrid(pos.x, GRID), gy = snapToGrid(pos.y, GRID);
+            const idx = placedComponents.findIndex(c =>
+                gx >= c.x && gx <= c.x + c.w && gy >= c.y && gy <= c.y + c.h
+            );
+            if (idx >= 0) { placedComponents.splice(idx, 1); updateChecklist(); draw(); return; }
+            const tIdx = traces.findIndex(t =>
+                t.points.some(p => Math.abs(p.x - gx) < GRID && Math.abs(p.y - gy) < GRID)
+            );
+            if (tIdx >= 0) { traces.splice(tIdx, 1); draw(); }
+        });
         window.addEventListener('resize', () => { if (document.getElementById('pcb-design').classList.contains('active')) resizeCanvas(); });
     }
 
@@ -390,57 +403,38 @@ const pcbGame = (() => {
             ctx.setLineDash([]);
         }
 
-        // Draw components
+        // Draw components (realistic visuals)
         placedComponents.forEach(comp => {
-            const type = COMPONENT_TYPES[comp.type];
-            // Body
-            ctx.fillStyle = type.color;
-            ctx.globalAlpha = 0.9;
-            roundRect(ctx, comp.x, comp.y, comp.w, comp.h, 4);
-            ctx.fill();
-            ctx.strokeStyle = powered ? '#ff9100' : type.color;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.globalAlpha = 1;
-
-            // Label
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 11px monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(type.symbol, comp.x + comp.w / 2, comp.y + comp.h / 2);
-
-            // Pins
-            comp.pins.forEach(pin => {
-                ctx.beginPath();
-                ctx.arc(pin.x, pin.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = powered ? '#ff9100' : '#00e676';
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            });
-
-            // Power glow
-            if (powered && (comp.type === 'led')) {
-                ctx.beginPath();
-                ctx.arc(comp.x + comp.w / 2, comp.y + comp.h / 2, GRID * 1.5, 0, Math.PI * 2);
-                const grad = ctx.createRadialGradient(comp.x + comp.w / 2, comp.y + comp.h / 2, 2, comp.x + comp.w / 2, comp.y + comp.h / 2, GRID * 1.5);
-                grad.addColorStop(0, 'rgba(255, 82, 82, 0.8)');
-                grad.addColorStop(1, 'rgba(255, 82, 82, 0)');
-                ctx.fillStyle = grad;
-                ctx.fill();
-            }
+            drawComponentRealistic(ctx, comp, COMPONENT_TYPES[comp.type], powered);
         });
 
-        // Hover preview
+        // Hover preview (realistic, semi-transparent)
         if (tool === 'place' && selectedComponent && hoverPos) {
             const type = COMPONENT_TYPES[selectedComponent];
-            ctx.globalAlpha = 0.4;
-            ctx.fillStyle = type.color;
-            roundRect(ctx, hoverPos.x, hoverPos.y, type.w * GRID, type.h * GRID, 4);
-            ctx.fill();
+            const fakeComp = { type: selectedComponent, x: hoverPos.x, y: hoverPos.y, w: type.w * GRID, h: type.h * GRID,
+                pins: type.pins.map(p => ({ x: hoverPos.x + p.dx * GRID, y: hoverPos.y + p.dy * GRID })) };
+            ctx.globalAlpha = 0.45;
+            drawComponentRealistic(ctx, fakeComp, type, false);
             ctx.globalAlpha = 1;
+        }
+
+        // Delete mode: red highlight on hovered component
+        if (tool === 'delete' && hoverPos) {
+            const hc = placedComponents.find(c =>
+                hoverPos.x >= c.x && hoverPos.x <= c.x + c.w && hoverPos.y >= c.y && hoverPos.y <= c.y + c.h);
+            if (hc) {
+                ctx.strokeStyle = '#ff5252';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 4]);
+                roundRect(ctx, hc.x - 3, hc.y - 3, hc.w + 6, hc.h + 6, 6);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // "×" icon
+                ctx.fillStyle = 'rgba(255,82,82,0.85)';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('×', hc.x + hc.w + 4, hc.y - 4);
+            }
         }
 
         // Pin highlight on hover in trace mode
@@ -454,6 +448,346 @@ const pcbGame = (() => {
                 ctx.stroke();
             }
         }
+    }
+
+    // ─── Realistic component drawing ────────────────────────────────────────
+    function drawComponentRealistic(ctx, comp, type, powered) {
+        const x = comp.x, y = comp.y, w = comp.w, h = comp.h;
+        const cx = x + w / 2, cy = y + h / 2;
+
+        ctx.save();
+        switch (comp.type) {
+            case 'resistor': drawResistor(ctx, x, y, w, h, powered); break;
+            case 'capacitor': drawCapacitor(ctx, x, y, w, h, powered); break;
+            case 'led': drawLED(ctx, x, y, w, h, powered); break;
+            case 'ic': drawIC(ctx, x, y, w, h, powered); break;
+            case 'transistor': drawTransistor(ctx, x, y, w, h, powered); break;
+            case 'battery': drawBatteryComp(ctx, x, y, w, h, powered); break;
+            case 'switch': drawSwitch(ctx, x, y, w, h, powered); break;
+            case 'potentiometer': drawPot(ctx, x, y, w, h, powered); break;
+            default:
+                ctx.fillStyle = type.color; roundRect(ctx, x, y, w, h, 4); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(type.symbol, cx, cy);
+        }
+        ctx.restore();
+
+        // Pins (always drawn same way)
+        comp.pins.forEach(pin => {
+            ctx.beginPath();
+            ctx.arc(pin.x, pin.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = powered ? '#ff9100' : '#00e676';
+            ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+        });
+
+        // LED power glow
+        if (powered && comp.type === 'led') {
+            ctx.beginPath();
+            ctx.arc(cx, cy, GRID * 1.8, 0, Math.PI * 2);
+            const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, GRID * 1.8);
+            grad.addColorStop(0, 'rgba(255,82,82,0.7)');
+            grad.addColorStop(1, 'rgba(255,82,82,0)');
+            ctx.fillStyle = grad; ctx.fill();
+        }
+    }
+
+    // ── Resistor: body with color bands ──────────────────────────────────────
+    function drawResistor(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        // Wire leads
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, cy); ctx.lineTo(x + w * 0.2, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + w * 0.8, cy); ctx.lineTo(x + w, cy); ctx.stroke();
+        // Body (cylinder shape)
+        const bx = x + w * 0.2, bw = w * 0.6, bh = h * 0.85, by = cy - bh / 2;
+        const grad = ctx.createLinearGradient(bx, by, bx, by + bh);
+        grad.addColorStop(0, '#f0dcc0');
+        grad.addColorStop(0.3, '#e8c8a0');
+        grad.addColorStop(0.7, '#d4a870');
+        grad.addColorStop(1, '#c09860');
+        ctx.fillStyle = grad;
+        roundRect(ctx, bx, by, bw, bh, 3); ctx.fill();
+        // Resistance bands (10kΩ = brown-black-orange-gold)
+        const bands = ['#8b4513', '#000', '#ff8c00', '#daa520'];
+        const bandW = bw * 0.08;
+        bands.forEach((color, i) => {
+            const bxOff = bx + bw * (0.18 + i * 0.18);
+            ctx.fillStyle = color;
+            ctx.fillRect(bxOff, by + 1, bandW, bh - 2);
+        });
+        // Outline
+        ctx.strokeStyle = 'rgba(120,80,40,0.5)'; ctx.lineWidth = 0.8;
+        roundRect(ctx, bx, by, bw, bh, 3); ctx.stroke();
+    }
+
+    // ── Capacitor: electrolytic barrel ───────────────────────────────────────
+    function drawCapacitor(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        const r = Math.min(w, h) * 0.4;
+        // Barrel body
+        const grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 1, cx, cy, r);
+        grad.addColorStop(0, '#3a9a85');
+        grad.addColorStop(1, '#1a6050');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        // Polarity stripe
+        ctx.fillStyle = 'rgba(200,200,200,0.4)';
+        ctx.beginPath();
+        ctx.moveTo(cx + r * 0.5, cy - r);
+        ctx.arc(cx, cy, r, -0.5, 0.5);
+        ctx.lineTo(cx + r * 0.5, cy - r);
+        ctx.fill();
+        // "−" stripe markings
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.5;
+        for (let i = -3; i <= 3; i++) {
+            const my = cy + i * (r * 0.2);
+            ctx.beginPath(); ctx.moveTo(cx + r * 0.4, my); ctx.lineTo(cx + r * 0.85, my); ctx.stroke();
+        }
+        // Top marking
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('100µF', cx, cy);
+        // Circle outline
+        ctx.strokeStyle = 'rgba(40,100,80,0.8)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        // Lead wires
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(cx - r * 0.3, cy - r); ctx.lineTo(cx - r * 0.3, cy - r - 4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + r * 0.3, cy + r); ctx.lineTo(cx + r * 0.3, cy + r + 4); ctx.stroke();
+    }
+
+    // ── LED: bullet dome with cathode flat ───────────────────────────────────
+    function drawLED(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        const r = Math.min(w, h) * 0.38;
+        // Dome (top half = curved, bottom = flat)
+        const bodyGrad = ctx.createRadialGradient(cx, cy - r * 0.3, 1, cx, cy, r * 1.2);
+        bodyGrad.addColorStop(0, powered ? 'rgba(255,120,120,0.95)' : 'rgba(255,100,100,0.7)');
+        bodyGrad.addColorStop(0.5, powered ? 'rgba(220,40,40,0.9)' : 'rgba(180,40,40,0.6)');
+        bodyGrad.addColorStop(1, powered ? 'rgba(180,0,0,0.9)' : 'rgba(120,20,20,0.5)');
+        ctx.fillStyle = bodyGrad;
+        // Dome shape
+        ctx.beginPath();
+        ctx.arc(cx, cy - r * 0.1, r, Math.PI, 0);
+        ctx.lineTo(cx + r, cy + r * 0.6);
+        ctx.lineTo(cx + r * 0.7, cy + r * 0.6); // cathode flat
+        ctx.lineTo(cx - r, cy + r * 0.6);
+        ctx.closePath();
+        ctx.fill();
+        // Internal die triangle
+        ctx.fillStyle = 'rgba(255,200,200,0.25)';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - r * 0.4);
+        ctx.lineTo(cx - r * 0.35, cy + r * 0.3);
+        ctx.lineTo(cx + r * 0.35, cy + r * 0.3);
+        ctx.closePath(); ctx.fill();
+        // Specular highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath(); ctx.arc(cx - r * 0.25, cy - r * 0.35, r * 0.18, 0, Math.PI * 2); ctx.fill();
+        // Cathode mark (flat edge)
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(cx + r * 0.55, cy + r * 0.35, r * 0.2, r * 0.25);
+        // Outline
+        ctx.strokeStyle = 'rgba(150,30,30,0.5)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(cx, cy - r * 0.1, r, Math.PI, 0);
+        ctx.lineTo(cx + r, cy + r * 0.6); ctx.lineTo(cx - r, cy + r * 0.6); ctx.closePath(); ctx.stroke();
+        // Lead wires
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(cx - r * 0.3, cy + r * 0.6); ctx.lineTo(cx - r * 0.3, cy + r + 6); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + r * 0.3, cy + r * 0.6); ctx.lineTo(cx + r * 0.3, cy + r + 6); ctx.stroke();
+    }
+
+    // ── IC Chip: DIP package ─────────────────────────────────────────────────
+    function drawIC(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        // Body
+        ctx.fillStyle = '#1a1a1a';
+        roundRect(ctx, x + 3, y + 2, w - 6, h - 4, 2); ctx.fill();
+        // Subtle texture
+        const tGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+        tGrad.addColorStop(0, 'rgba(50,50,50,0.4)');
+        tGrad.addColorStop(0.5, 'rgba(30,30,30,0)');
+        tGrad.addColorStop(1, 'rgba(50,50,50,0.3)');
+        ctx.fillStyle = tGrad;
+        roundRect(ctx, x + 3, y + 2, w - 6, h - 4, 2); ctx.fill();
+        // Pin 1 notch (top-left semicircle)
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(x + 3, cy, 4, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+        // Pin 1 dot
+        ctx.fillStyle = '#555';
+        ctx.beginPath(); ctx.arc(x + 10, y + 8, 2, 0, Math.PI * 2); ctx.fill();
+        // Pin rows (left side)
+        for (let i = 0; i < 4; i++) {
+            const py = y + 4 + i * ((h - 8) / 3);
+            ctx.fillStyle = '#aaa';
+            ctx.fillRect(x - 2, py, 6, 3);
+        }
+        // Pin rows (right side)
+        for (let i = 0; i < 4; i++) {
+            const py = y + 4 + i * ((h - 8) / 3);
+            ctx.fillStyle = '#aaa';
+            ctx.fillRect(x + w - 4, py, 6, 3);
+        }
+        // Label
+        ctx.fillStyle = '#888'; ctx.font = '7px monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('NE555', cx, cy - 4);
+        ctx.fillStyle = '#555'; ctx.font = '5px monospace';
+        ctx.fillText('DIP-8', cx, cy + 5);
+        // Outline
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+        roundRect(ctx, x + 3, y + 2, w - 6, h - 4, 2); ctx.stroke();
+    }
+
+    // ── Transistor: TO-92 D-shape ────────────────────────────────────────────
+    function drawTransistor(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        const r = Math.min(w, h) * 0.38;
+        // D-shaped body (flat face left, curve right)
+        const grad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+        grad.addColorStop(0, '#2a1a40');
+        grad.addColorStop(1, '#5a3a80');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.5, cy - r * 0.9);
+        ctx.lineTo(cx - r * 0.5, cy + r * 0.9);
+        ctx.arc(cx, cy, r * 0.9, Math.PI * 0.58, -Math.PI * 0.58);
+        ctx.closePath(); ctx.fill();
+        // Flat face surface
+        ctx.fillStyle = 'rgba(180,160,200,0.15)';
+        ctx.fillRect(cx - r * 0.5, cy - r * 0.8, r * 0.3, r * 1.6);
+        // Label
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '5px monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('2N2222', cx + r * 0.1, cy);
+        // 3 leads
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(cx - r * 0.3, cy + r * 0.9); ctx.lineTo(cx - r * 0.3, cy + r + 6); ctx.stroke(); // E
+        ctx.beginPath(); ctx.moveTo(cx, cy + r * 0.9); ctx.lineTo(cx, cy + r + 6); ctx.stroke(); // B
+        ctx.beginPath(); ctx.moveTo(cx + r * 0.3, cy + r * 0.9); ctx.lineTo(cx + r * 0.3, cy + r + 6); ctx.stroke(); // C
+        // Lead labels
+        ctx.fillStyle = 'rgba(200,180,255,0.6)'; ctx.font = 'bold 6px monospace';
+        ctx.fillText('E', cx - r * 0.3, cy + r + 10);
+        ctx.fillText('B', cx, cy + r + 10);
+        ctx.fillText('C', cx + r * 0.3, cy + r + 10);
+        // Outline
+        ctx.strokeStyle = 'rgba(100,60,160,0.6)'; ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.5, cy - r * 0.9);
+        ctx.lineTo(cx - r * 0.5, cy + r * 0.9);
+        ctx.arc(cx, cy, r * 0.9, Math.PI * 0.58, -Math.PI * 0.58);
+        ctx.closePath(); ctx.stroke();
+    }
+
+    // ── Battery: cell with terminals ─────────────────────────────────────────
+    function drawBatteryComp(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        // Cell body
+        const grad = ctx.createLinearGradient(x, y, x + w, y);
+        grad.addColorStop(0, '#cc7000');
+        grad.addColorStop(0.5, '#ff9f20');
+        grad.addColorStop(1, '#cc7000');
+        ctx.fillStyle = grad;
+        roundRect(ctx, x + 2, y + 6, w - 4, h - 12, 4); ctx.fill();
+        // + terminal (red nub at top)
+        ctx.fillStyle = '#cc2222';
+        roundRect(ctx, cx - 6, y, 12, 8, 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 8px sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('+', cx, y + 4);
+        // − terminal (black/flat bottom)
+        ctx.fillStyle = '#333';
+        roundRect(ctx, cx - 8, y + h - 6, 16, 6, 2); ctx.fill();
+        ctx.fillStyle = '#aaa'; ctx.font = 'bold 8px sans-serif';
+        ctx.fillText('−', cx, y + h - 3);
+        // Label
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.font = 'bold 8px monospace';
+        ctx.fillText('9V', cx, cy);
+        // Voltage marking outline
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 0.5;
+        roundRect(ctx, x + 2, y + 6, w - 4, h - 12, 4); ctx.stroke();
+    }
+
+    // ── Switch: toggle lever ─────────────────────────────────────────────────
+    function drawSwitch(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        // Base plate
+        ctx.fillStyle = '#1a2a3a';
+        roundRect(ctx, x + 2, y + 1, w - 4, h - 2, 3); ctx.fill();
+        // Metal contacts
+        ctx.fillStyle = '#c0c0c0';
+        ctx.fillRect(x + 4, cy - 2, 6, 4);
+        ctx.fillRect(x + w - 10, cy - 2, 6, 4);
+        // Toggle lever
+        const leverOn = powered;
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x + 7, cy);
+        if (leverOn) {
+            ctx.lineTo(x + w - 7, cy);
+        } else {
+            ctx.lineTo(cx, cy - h * 0.6);
+        }
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+        // Lever knob
+        const kx = leverOn ? x + w - 7 : cx;
+        const ky = leverOn ? cy : cy - h * 0.6;
+        ctx.fillStyle = '#eee';
+        ctx.beginPath(); ctx.arc(kx, ky, 3.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#888'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.arc(kx, ky, 3.5, 0, Math.PI * 2); ctx.stroke();
+        // ON/OFF label
+        ctx.fillStyle = leverOn ? '#3ecf71' : '#ff5252';
+        ctx.font = 'bold 6px monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(leverOn ? 'ON' : 'OFF', cx, y + h + 1);
+        ctx.textBaseline = 'alphabetic';
+        // Outline
+        ctx.strokeStyle = 'rgba(100,160,200,0.4)'; ctx.lineWidth = 0.8;
+        roundRect(ctx, x + 2, y + 1, w - 4, h - 2, 3); ctx.stroke();
+    }
+
+    // ── Potentiometer: circular dial ─────────────────────────────────────────
+    function drawPot(ctx, x, y, w, h, powered) {
+        const cx = x + w / 2, cy = y + h / 2;
+        const r = Math.min(w, h) * 0.4;
+        // Base
+        ctx.fillStyle = '#204060';
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        // Resistance track ring
+        ctx.strokeStyle = 'rgba(200,180,60,0.6)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, cy, r * 0.75, 0.3, Math.PI * 2 - 0.3); ctx.stroke();
+        // Wiper arrow
+        ctx.strokeStyle = '#eee'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + r * 0.65, cy - r * 0.3); ctx.stroke();
+        // Arrow head
+        ctx.fillStyle = '#eee';
+        ctx.beginPath();
+        ctx.moveTo(cx + r * 0.65, cy - r * 0.3);
+        ctx.lineTo(cx + r * 0.45, cy - r * 0.15);
+        ctx.lineTo(cx + r * 0.5, cy - r * 0.45);
+        ctx.closePath(); ctx.fill();
+        // Center dot (shaft)
+        ctx.fillStyle = '#888';
+        ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+        // Knob grip lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 0.5;
+        for (let a = 0; a < Math.PI * 2; a += 0.5) {
+            ctx.beginPath();
+            ctx.moveTo(cx + Math.cos(a) * r * 0.85, cy + Math.sin(a) * r * 0.85);
+            ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+            ctx.stroke();
+        }
+        // Label
+        ctx.fillStyle = 'rgba(200,220,255,0.5)'; ctx.font = '5px monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('10kΩ', cx, cy + r + 6);
+        // Outline
+        ctx.strokeStyle = 'rgba(60,120,180,0.5)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
     }
 
     function getTutorialAPI() {
