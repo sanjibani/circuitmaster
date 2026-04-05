@@ -107,7 +107,8 @@ const pcbGame = (() => {
             name: '🪔 Diwali LED Diya',
             story: 'Real oil diyas are beautiful but risky around kids and curtains. Build a 555 astable that makes a warm LED flicker like a real flame — line them along the balcony this Diwali.',
             bom: '₹60 · Used in: festive lighting, rangoli decor, puja rooms',
-            required: ['battery', 'ic', 'capacitor', 'resistor', 'led'],
+            // Order MUST match checklist text order (IC first, then battery, cap, resistor, LED)
+            required: ['ic', 'battery', 'capacitor', 'resistor', 'led'],
             connections: [
                 ['battery:0', 'ic:0'],
                 ['ic:1', 'battery:1'],
@@ -140,7 +141,8 @@ const pcbGame = (() => {
             name: '🔌 Mobile USB Charger',
             story: 'The charger brick you plug in every night. Inside: a regulator IC, smoothing caps and a power-indicator LED. Build the output stage — the exact thing that keeps your phone alive during 4 G streaming.',
             bom: '₹80 · Used in: every phone charger, power bank, set-top box',
-            required: ['battery', 'ic', 'capacitor', 'capacitor', 'resistor', 'led'],
+            // Order MUST match checklist text order (IC first, battery second, then caps, resistor, LED)
+            required: ['ic', 'battery', 'capacitor', 'capacitor', 'resistor', 'led'],
             connections: [
                 ['battery:0', 'ic:0'],
                 ['ic:1', 'battery:1'],
