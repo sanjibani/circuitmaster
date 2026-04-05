@@ -64,14 +64,17 @@ const assemblyPro = (() => {
           brief: 'Test three ESD devices with the multimeter. Pass only valid readings — rejecting good equipment or passing bad equipment will fail the operator.',
           render: renderEsdMission },
         { id: '5s',     icon: '🧹',  title: '5S Workstation Audit',     pcs: ['PC1.3'],
-          brief: 'Stub — full Spot-the-Violation mission in next build.', stub: true },
+          brief: 'Spot every 5S violation on the workstation before the shift starts. Miss a hazard and the line cannot go live. False reports also lose points.',
+          render: renderFiveSMission },
         { id: 'torque', icon: '🔧',  title: 'Torque Driver Calibration', pcs: ['PC1.4', 'PC3.2'],
-          brief: 'Stub — full Dial-the-Needle mission in next build.',   stub: true },
+          brief: 'Calibrate the torque driver to three model-specific specs by dialling the needle into the green band. Over-torque cracks glass; under-torque loosens screws on the line.',
+          render: renderTorqueMission },
         { id: 'kit',    icon: '📦',  title: 'Kit & BOM Verification',    pcs: ['PC1.5', 'PC1.6'],
           brief: 'Match each bin to the correct BOM line. Two bins are wrong-revision or wrong-quantity — send them to the Reject tray. False-accepts fail the operator.',
           render: renderKitMission },
         { id: 'jig',    icon: '🧰',  title: 'JIG & Fixture Setup',       pcs: ['PC1.7'],
-          brief: 'Stub — full Snap-Fit Alignment mission in next build.', stub: true },
+          brief: 'Drop the phone chassis into the assembly jig. Align all four corner pegs within tolerance before the clamp will lock. Mis-seat and the jig shakes — misalignment on the line means scratched bezels.',
+          render: renderJigMission },
         { id: 'msd',    icon: '💧',  title: 'MSD Moisture Decision',     pcs: ['PC1.8'],
           brief: 'Read the Humidity Indicator Card and the floor-exposure log, then pick the correct disposition: Use, Bake 24 h, or Scrap.',
           render: renderMsdMission },
@@ -847,6 +850,587 @@ const assemblyPro = (() => {
             wrap.querySelector('.msd-retry').addEventListener('click', () => resetMission(m.id));
         } else {
             loadRound();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MISSION — 5S Workstation Audit (Spot-the-Violation)
+    // ─ A top-down workstation illustration with 8 hotspots. 4–6 are 5S
+    //   violations (food, stray tools, missing ESD strap, unlabelled bin,
+    //   tripping cable, expired HIC). Operator taps every violation they
+    //   spot, then hits "Submit Audit". Missed violations are critical;
+    //   false reports are soft penalties. Pass requires every real
+    //   violation caught and at most one false report.
+    // ═══════════════════════════════════════════════════════════════════════
+    function renderFiveSMission(body, m) {
+        const state = missionState[m.id];
+        // Each hotspot: {id, x, y, w, h, label, violation, reason}
+        // Coordinates are normalised to the 640x360 canvas below.
+        const ALL_SPOTS = [
+            { id: 'food',     x: 40,  y: 40,  w: 60, h: 48, label: 'Tea cup on bench',      violation: true,  reason: 'Food/drink on an ESD workbench — contamination + spill risk (Sort + Shine)' },
+            { id: 'stray',    x: 520, y: 36,  w: 70, h: 50, label: 'Stray screwdriver',     violation: true,  reason: 'Tool not in shadow board — loss of tool control (Set in Order)' },
+            { id: 'cable',    x: 250, y: 290, w: 120,h: 42, label: 'Loose power cable',     violation: true,  reason: 'Cable across walkway — tripping hazard (Safety / Shine)' },
+            { id: 'nobin',    x: 150, y: 220, w: 64, h: 58, label: 'Unlabelled scrap bin',  violation: true,  reason: 'Bin not labelled with part family — traceability loss (Standardize)' },
+            { id: 'wrist',    x: 440, y: 210, w: 70, h: 60, label: 'Wrist strap unplugged', violation: true,  reason: 'ESD wrist strap coiled on bench, not worn (PC1.1 + Sustain)' },
+            { id: 'hic',      x: 360, y: 130, w: 60, h: 46, label: 'Expired MSD bag',       violation: true,  reason: 'Moisture-sensitive component bag past exposure limit (PC1.8)' },
+            { id: 'torque',   x: 60,  y: 200, w: 70, h: 60, label: 'Torque driver in cradle',violation: false, reason: 'Correctly stored in calibrated cradle' },
+            { id: 'bom',      x: 260, y: 60,  w: 70, h: 50, label: 'Travel card posted',    violation: false, reason: 'Travel card visible at station — correct' },
+            { id: 'mat',      x: 560, y: 300, w: 60, h: 40, label: 'ESD mat ground lead',   violation: false, reason: 'Grounded correctly via mat lug' },
+            { id: 'parts',    x: 60,  y: 120, w: 60, h: 52, label: 'Kitted parts tray',     violation: false, reason: 'Tray matches BOM, labelled correctly' },
+        ];
+        // Shuffle which are violations: pick 5 violations + 3 non-violations from pools
+        const violations = ALL_SPOTS.filter(s => s.violation).sort(() => Math.random() - 0.5).slice(0, 5);
+        const nonViol    = ALL_SPOTS.filter(s => !s.violation).sort(() => Math.random() - 0.5).slice(0, 3);
+        const spots = [...violations, ...nonViol].sort(() => Math.random() - 0.5);
+        const flagged = new Set(); // spot.id
+
+        body.innerHTML = `
+            <div class="fives-mission">
+                <div class="fives-scene">
+                    <canvas class="fives-canvas" width="640" height="360"></canvas>
+                    <div class="fives-hotspots"></div>
+                </div>
+                <div class="fives-panel">
+                    <div class="fives-legend">
+                        <div><strong>Seiri</strong> Sort · <strong>Seiton</strong> Set in Order · <strong>Seiso</strong> Shine · <strong>Seiketsu</strong> Standardize · <strong>Shitsuke</strong> Sustain</div>
+                    </div>
+                    <div class="fives-instr">Tap every 5S violation you can see on the bench. Clicking a non-violation is a false report. Submit when you're confident.</div>
+                    <div class="fives-counter">Flagged: <span class="fives-count">0</span></div>
+                    <button class="btn btn-primary fives-submit">Submit Audit</button>
+                    <div class="fives-log"></div>
+                </div>
+            </div>
+        `;
+
+        const canvas = body.querySelector('.fives-canvas');
+        const ctx = canvas.getContext('2d');
+        const hostHotspots = body.querySelector('.fives-hotspots');
+        const countEl = body.querySelector('.fives-count');
+        const log = body.querySelector('.fives-log');
+        const submitBtn = body.querySelector('.fives-submit');
+
+        drawWorkstation();
+
+        function drawWorkstation() {
+            const w = canvas.width, h = canvas.height;
+            // Floor
+            const g = ctx.createLinearGradient(0, 0, 0, h);
+            g.addColorStop(0, '#1b2434'); g.addColorStop(1, '#0b1220');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+            // Bench top
+            ctx.fillStyle = '#2c3b55';
+            roundRectPath(ctx, 30, 100, w - 60, 180, 10); ctx.fill();
+            ctx.strokeStyle = 'rgba(160,180,210,0.25)'; ctx.lineWidth = 1.5; ctx.stroke();
+            // ESD mat
+            ctx.fillStyle = '#0f3a2a'; roundRectPath(ctx, 160, 130, 320, 120, 6); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            for (let i = 0; i < 20; i++) { ctx.fillRect(160, 140 + i * 6, 320, 1); }
+            ctx.fillStyle = '#8fa0b8'; ctx.font = '9px "JetBrains Mono", monospace';
+            ctx.fillText('ESD SAFE WORKSTATION · LINE 4 · STATION 02', 170, 122);
+            // Shadow-board outline behind
+            ctx.strokeStyle = 'rgba(200,220,255,0.15)'; ctx.setLineDash([4, 3]);
+            ctx.strokeRect(500, 36, 110, 60); ctx.setLineDash([]);
+            ctx.fillStyle = '#8fa0b8'; ctx.fillText('TOOL SHADOW BOARD', 506, 30);
+            // Walkway hint
+            ctx.fillStyle = 'rgba(255,180,0,0.08)';
+            ctx.fillRect(0, 290, w, 10);
+        }
+
+        spots.forEach(s => {
+            const el = document.createElement('button');
+            el.type = 'button';
+            el.className = 'fives-spot';
+            el.style.left = (s.x / 640 * 100) + '%';
+            el.style.top  = (s.y / 360 * 100) + '%';
+            el.style.width  = (s.w / 640 * 100) + '%';
+            el.style.height = (s.h / 360 * 100) + '%';
+            el.innerHTML = `<span class="fs-label">${s.label}</span>`;
+            el.addEventListener('click', () => {
+                if (submitBtn.disabled) return;
+                if (flagged.has(s.id)) { flagged.delete(s.id); el.classList.remove('flagged'); }
+                else                   { flagged.add(s.id);    el.classList.add('flagged'); }
+                countEl.textContent = flagged.size;
+            });
+            hostHotspots.appendChild(el);
+        });
+
+        submitBtn.addEventListener('click', () => {
+            const truePositives = spots.filter(s => s.violation && flagged.has(s.id));
+            const missed        = spots.filter(s => s.violation && !flagged.has(s.id));
+            const falsePos      = spots.filter(s => !s.violation && flagged.has(s.id));
+            const totalViol     = spots.filter(s => s.violation).length;
+            const raw = (truePositives.length / totalViol) * 100;
+            const score = Math.max(0, Math.round(raw - missed.length * 20 - falsePos.length * 12));
+            const passed = missed.length === 0 && falsePos.length <= 1;
+            // Reveal answers visually
+            hostHotspots.querySelectorAll('.fives-spot').forEach((el, i) => {
+                const s = spots[i];
+                el.classList.remove('flagged');
+                if (s.violation && flagged.has(s.id))      el.classList.add('tp');
+                else if (s.violation && !flagged.has(s.id)) el.classList.add('fn');
+                else if (!s.violation && flagged.has(s.id)) el.classList.add('fp');
+                else                                        el.classList.add('tn');
+                el.disabled = true;
+            });
+            submitBtn.disabled = true;
+            [...missed.map(s => ({ s, tag: 'missed' })),
+             ...falsePos.map(s => ({ s, tag: 'false' })),
+             ...truePositives.map(s => ({ s, tag: 'ok' }))].forEach(({ s, tag }) => {
+                const line = document.createElement('div');
+                line.className = 'fives-log-line ' + (tag === 'ok' ? 'ok' : 'bad');
+                const prefix = tag === 'ok' ? '✓ caught' : tag === 'missed' ? '✗ MISSED' : '✗ false report';
+                line.innerHTML = `${prefix}: ${s.label} — ${s.reason}`;
+                log.appendChild(line);
+            });
+            const wrap = document.createElement('div');
+            wrap.className = 'esd-summary';
+            wrap.innerHTML = `
+                <div class="esd-summary-score" style="color:${barColor(score)}">${score}</div>
+                <div class="esd-summary-label">${truePositives.length}/${totalViol} violations caught · ${falsePos.length} false report${falsePos.length === 1 ? '' : 's'}</div>
+                <button class="btn btn-primary fives-retry">Retry Audit</button>
+                <button class="btn btn-success fives-done">Submit Score</button>
+            `;
+            body.querySelector('.fives-panel').appendChild(wrap);
+            wrap.querySelector('.fives-retry').addEventListener('click', () => resetMission(m.id));
+            wrap.querySelector('.fives-done').addEventListener('click', () => completeMission(m.id, score, passed));
+        });
+
+        if (state.done) {
+            hostHotspots.querySelectorAll('.fives-spot').forEach(el => el.disabled = true);
+            submitBtn.disabled = true;
+            const wrap = document.createElement('div');
+            wrap.className = 'esd-summary';
+            wrap.innerHTML = `
+                <div class="esd-summary-score" style="color:${barColor(state.score)}">${state.score}</div>
+                <div class="esd-summary-label">Completed · retry to improve</div>
+                <button class="btn btn-primary fives-retry">Retry Audit</button>
+            `;
+            body.querySelector('.fives-panel').appendChild(wrap);
+            wrap.querySelector('.fives-retry').addEventListener('click', () => resetMission(m.id));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MISSION — Torque Driver Calibration (Dial-the-Needle)
+    // ─ Three fasteners in sequence (frame M1.4 = 1.5 Nm, display = 0.8 Nm,
+    //   battery bracket = 1.2 Nm). Operator drags a slider to set the driver.
+    //   Needle animates to their setting. Must land inside the ±0.08 Nm
+    //   green band and press "Calibrate". Three attempts per fastener; each
+    //   over-torque is a hard penalty (cracks glass on the line).
+    // ═══════════════════════════════════════════════════════════════════════
+    function renderTorqueMission(body, m) {
+        const state = missionState[m.id];
+        const fasteners = [
+            { name: 'Titanium Frame M1.4', target: 1.5, tol: 0.08, min: 0.4, max: 2.4, hint: 'Frame screws need firm seating — consult the spec card.' },
+            { name: 'Display Bracket',      target: 0.8, tol: 0.08, min: 0.4, max: 2.4, hint: 'Display ribbon is delicate — under-torque is safer than over-torque.' },
+            { name: 'Battery Pull-Tab',     target: 1.2, tol: 0.08, min: 0.4, max: 2.4, hint: 'Battery bracket must hold under vibration but not crush the pouch.' },
+        ];
+        let idx = 0;
+        let tries = 0;
+        let hits = 0;
+        let overTorqueHard = 0;
+
+        body.innerHTML = `
+            <div class="tcal-mission">
+                <div class="tcal-stage">
+                    <canvas class="tcal-dial" width="360" height="240"></canvas>
+                    <div class="tcal-readout">
+                        <div class="tcal-row"><span class="tcal-lbl">Fastener</span><span class="tcal-fast">—</span></div>
+                        <div class="tcal-row"><span class="tcal-lbl">Spec</span><span class="tcal-spec">—</span></div>
+                        <div class="tcal-row"><span class="tcal-lbl">Current</span><span class="tcal-cur">—</span></div>
+                        <div class="tcal-row"><span class="tcal-lbl">Round</span><span class="tcal-round">1 / ${fasteners.length}</span></div>
+                        <div class="tcal-hint tcal-hint-text">—</div>
+                    </div>
+                </div>
+                <div class="tcal-controls">
+                    <label class="tcal-slider-label">Driver setting (Nm)</label>
+                    <input type="range" class="tcal-slider" min="0.4" max="2.4" step="0.01" value="1.0">
+                    <div class="tcal-btns">
+                        <button class="btn btn-primary tcal-lock">Calibrate at <span class="tcal-lock-val">1.00</span> Nm</button>
+                    </div>
+                    <div class="tcal-log"></div>
+                </div>
+            </div>
+        `;
+
+        const canvas = body.querySelector('.tcal-dial');
+        const ctx = canvas.getContext('2d');
+        const slider = body.querySelector('.tcal-slider');
+        const curEl = body.querySelector('.tcal-cur');
+        const specEl = body.querySelector('.tcal-spec');
+        const fastEl = body.querySelector('.tcal-fast');
+        const roundEl = body.querySelector('.tcal-round');
+        const hintEl = body.querySelector('.tcal-hint-text');
+        const lockBtn = body.querySelector('.tcal-lock');
+        const lockVal = body.querySelector('.tcal-lock-val');
+        const log = body.querySelector('.tcal-log');
+
+        function drawDial(value, f) {
+            const w = canvas.width, h = canvas.height;
+            const cx = w / 2, cy = h * 0.95, r = h * 0.82;
+            ctx.clearRect(0, 0, w, h);
+            const bg = ctx.createLinearGradient(0, 0, 0, h);
+            bg.addColorStop(0, '#1a2234'); bg.addColorStop(1, '#0a1020');
+            ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+            // Dial face
+            ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, 0); ctx.closePath();
+            const fg = ctx.createRadialGradient(cx, cy - 30, 10, cx, cy, r);
+            fg.addColorStop(0, '#1a2f26'); fg.addColorStop(1, '#081812');
+            ctx.fillStyle = fg; ctx.fill();
+            ctx.strokeStyle = '#2a5040'; ctx.lineWidth = 2; ctx.stroke();
+            // Red danger arc (over-torque zone)
+            const overStart = Math.PI + Math.PI * (f.target + f.tol - f.min) / (f.max - f.min);
+            ctx.beginPath(); ctx.arc(cx, cy, r - 8, overStart, Math.PI * 2);
+            ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(255, 82, 82, 0.55)'; ctx.stroke();
+            // Green good band
+            const s = Math.PI + Math.PI * (f.target - f.tol - f.min) / (f.max - f.min);
+            const e = Math.PI + Math.PI * (f.target + f.tol - f.min) / (f.max - f.min);
+            ctx.beginPath(); ctx.arc(cx, cy, r - 8, s, e);
+            ctx.lineWidth = 12; ctx.strokeStyle = 'rgba(62, 207, 113, 0.9)'; ctx.stroke();
+            // Amber approach
+            const as = Math.PI + Math.PI * (f.target - f.tol * 3 - f.min) / (f.max - f.min);
+            ctx.beginPath(); ctx.arc(cx, cy, r - 8, as, s);
+            ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(255,180,60,0.55)'; ctx.stroke();
+            // Ticks + labels
+            for (let i = 0; i <= 10; i++) {
+                const a = Math.PI + (Math.PI * i) / 10;
+                const x1 = cx + Math.cos(a) * (r - 20), y1 = cy + Math.sin(a) * (r - 20);
+                const x2 = cx + Math.cos(a) * (r - 8),  y2 = cy + Math.sin(a) * (r - 8);
+                ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+                ctx.strokeStyle = '#8fa0b8'; ctx.lineWidth = i % 5 === 0 ? 2 : 1; ctx.stroke();
+                if (i % 2 === 0) {
+                    const xn = cx + Math.cos(a) * (r - 36), yn = cy + Math.sin(a) * (r - 36);
+                    const val = f.min + (f.max - f.min) * (i / 10);
+                    ctx.fillStyle = '#c8d0dc'; ctx.font = '10px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+                    ctx.fillText(val.toFixed(1), xn, yn + 3);
+                }
+            }
+            // Needle
+            const v = Math.max(f.min, Math.min(f.max, value));
+            const a = Math.PI + Math.PI * (v - f.min) / (f.max - f.min);
+            ctx.save(); ctx.translate(cx, cy); ctx.rotate(a + Math.PI);
+            ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(0, -(r - 24)); ctx.lineTo(5, 0); ctx.closePath();
+            ctx.fillStyle = '#ffe16b'; ctx.fill();
+            ctx.strokeStyle = '#3a2a00'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.restore();
+            ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fillStyle = '#1c1511'; ctx.fill();
+            ctx.fillStyle = '#8fa0b8'; ctx.font = '9px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+            ctx.fillText('DIGITAL TORQUE DRIVER · NM', cx, h - 6);
+        }
+
+        let animRAF = null, displayed = 0.4;
+        function animateTo(target, f) {
+            if (animRAF) cancelAnimationFrame(animRAF);
+            const step = () => {
+                displayed += (target - displayed) * 0.2;
+                drawDial(displayed, f);
+                if (Math.abs(displayed - target) > 0.002) animRAF = requestAnimationFrame(step);
+                else { displayed = target; drawDial(displayed, f); }
+            };
+            step();
+        }
+
+        function loadFastener() {
+            if (idx >= fasteners.length) return finish();
+            const f = fasteners[idx];
+            fastEl.textContent = f.name;
+            specEl.textContent = `${f.target.toFixed(2)} Nm ± ${f.tol.toFixed(2)}`;
+            roundEl.textContent = `${idx + 1} / ${fasteners.length}`;
+            hintEl.textContent = f.hint;
+            slider.value = (f.min + 0.2).toFixed(2);
+            curEl.textContent = `${(+slider.value).toFixed(2)} Nm`;
+            lockVal.textContent = (+slider.value).toFixed(2);
+            tries = 0;
+            lockBtn.disabled = false;
+            animateTo(+slider.value, f);
+        }
+
+        slider.addEventListener('input', () => {
+            const f = fasteners[idx];
+            if (!f) return;
+            curEl.textContent = `${(+slider.value).toFixed(2)} Nm`;
+            lockVal.textContent = (+slider.value).toFixed(2);
+            animateTo(+slider.value, f);
+        });
+
+        lockBtn.addEventListener('click', () => {
+            const f = fasteners[idx];
+            if (!f) return;
+            const v = +slider.value;
+            tries++;
+            const delta = v - f.target;
+            const inBand = Math.abs(delta) <= f.tol;
+            const overHard = delta > f.tol * 2.5;
+            const line = document.createElement('div');
+            if (inBand) {
+                hits++;
+                line.className = 'tcal-log-line ok';
+                line.innerHTML = `✓ ${f.name}: locked at ${v.toFixed(2)} Nm (target ${f.target.toFixed(2)})`;
+                log.appendChild(line);
+                idx++;
+                setTimeout(loadFastener, 600);
+            } else {
+                if (overHard) overTorqueHard++;
+                line.className = 'tcal-log-line bad';
+                line.innerHTML = `✗ ${f.name}: ${v.toFixed(2)} Nm — ${delta > 0 ? 'OVER' : 'UNDER'} by ${Math.abs(delta).toFixed(2)} Nm${overHard ? ' · would crack the part' : ''}`;
+                log.appendChild(line);
+                if (tries >= 3) {
+                    idx++;
+                    setTimeout(loadFastener, 600);
+                }
+            }
+        });
+
+        function finish() {
+            lockBtn.disabled = true;
+            const raw = (hits / fasteners.length) * 100;
+            const score = Math.max(0, Math.round(raw - overTorqueHard * 25));
+            const passed = hits === fasteners.length && overTorqueHard === 0;
+            const wrap = document.createElement('div');
+            wrap.className = 'esd-summary';
+            wrap.innerHTML = `
+                <div class="esd-summary-score" style="color:${barColor(score)}">${score}</div>
+                <div class="esd-summary-label">${hits}/${fasteners.length} calibrated · ${overTorqueHard} over-torque event${overTorqueHard === 1 ? '' : 's'}</div>
+                <button class="btn btn-primary tcal-retry">Retry</button>
+                <button class="btn btn-success tcal-submit">Submit Score</button>
+            `;
+            body.querySelector('.tcal-controls').appendChild(wrap);
+            wrap.querySelector('.tcal-retry').addEventListener('click', () => resetMission(m.id));
+            wrap.querySelector('.tcal-submit').addEventListener('click', () => completeMission(m.id, score, passed));
+        }
+
+        if (state.done) {
+            drawDial(fasteners[0].target, fasteners[0]);
+            fastEl.textContent = fasteners[0].name;
+            specEl.textContent = `${fasteners[0].target.toFixed(2)} Nm ± ${fasteners[0].tol.toFixed(2)}`;
+            lockBtn.disabled = true; slider.disabled = true;
+            const wrap = document.createElement('div');
+            wrap.className = 'esd-summary';
+            wrap.innerHTML = `
+                <div class="esd-summary-score" style="color:${barColor(state.score)}">${state.score}</div>
+                <div class="esd-summary-label">Completed · retry to improve</div>
+                <button class="btn btn-primary tcal-retry">Retry Mission</button>
+            `;
+            body.querySelector('.tcal-controls').appendChild(wrap);
+            wrap.querySelector('.tcal-retry').addEventListener('click', () => resetMission(m.id));
+        } else {
+            loadFastener();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MISSION — JIG & Fixture Setup (Snap-Fit Alignment)
+    // ─ Top-down jig with 4 corner pegs. Operator drags the phone chassis
+    //   onto the jig; each corner shows a live distance-to-peg indicator.
+    //   All four corners must be within ±6 px of nominal. Also a rotation
+    //   slider must be within ±2°. Click "Lock Clamp" to submit. Score =
+    //   alignment quality; fail if any peg is outside tolerance.
+    // ═══════════════════════════════════════════════════════════════════════
+    function renderJigMission(body, m) {
+        const state = missionState[m.id];
+        const TOL_POS = 6;    // px per corner
+        const TOL_ROT = 2;    // degrees
+        const JIG = { cx: 340, cy: 210, w: 220, h: 330 }; // nominal phone footprint inside jig
+        let phone = { cx: 130, cy: 120, rot: -8 };         // start off-jig, tilted
+        let dragging = false, dragOff = { x: 0, y: 0 };
+        let locked = false;
+        let attempts = 0;
+        let bestScore = 0;
+
+        body.innerHTML = `
+            <div class="jig-mission">
+                <div class="jig-stage">
+                    <canvas class="jig-canvas" width="680" height="440"></canvas>
+                </div>
+                <div class="jig-panel">
+                    <div class="jig-instr">
+                        Drag the phone chassis onto the assembly jig. Line up all four corner pegs (green = in tolerance, red = out). When every corner is green, click <strong>Lock Clamp</strong>.
+                    </div>
+                    <div class="jig-rot">
+                        <label>Rotation fine-tune</label>
+                        <input type="range" class="jig-rot-slider" min="-15" max="15" step="0.1" value="-8">
+                        <div class="jig-rot-val">-8.0°</div>
+                    </div>
+                    <div class="jig-corners">
+                        <div class="jig-corner" data-k="tl">TL <span>—</span></div>
+                        <div class="jig-corner" data-k="tr">TR <span>—</span></div>
+                        <div class="jig-corner" data-k="bl">BL <span>—</span></div>
+                        <div class="jig-corner" data-k="br">BR <span>—</span></div>
+                    </div>
+                    <button class="btn btn-primary jig-lock" disabled>Lock Clamp</button>
+                    <div class="jig-log"></div>
+                </div>
+            </div>
+        `;
+
+        const canvas = body.querySelector('.jig-canvas');
+        const ctx = canvas.getContext('2d');
+        const slider = body.querySelector('.jig-rot-slider');
+        const rotValEl = body.querySelector('.jig-rot-val');
+        const lockBtn = body.querySelector('.jig-lock');
+        const cornerEls = Array.from(body.querySelectorAll('.jig-corner'));
+        const log = body.querySelector('.jig-log');
+
+        function cornersOfPhone() {
+            const { cx, cy, rot } = phone;
+            const hw = JIG.w / 2, hh = JIG.h / 2;
+            const rad = rot * Math.PI / 180;
+            const cos = Math.cos(rad), sin = Math.sin(rad);
+            const pts = [
+                { x: -hw, y: -hh }, { x:  hw, y: -hh },
+                { x: -hw, y:  hh }, { x:  hw, y:  hh },
+            ];
+            return pts.map(p => ({ x: cx + p.x * cos - p.y * sin, y: cy + p.x * sin + p.y * cos }));
+        }
+        function jigPegs() {
+            const hw = JIG.w / 2, hh = JIG.h / 2;
+            return [
+                { x: JIG.cx - hw, y: JIG.cy - hh }, { x: JIG.cx + hw, y: JIG.cy - hh },
+                { x: JIG.cx - hw, y: JIG.cy + hh }, { x: JIG.cx + hw, y: JIG.cy + hh },
+            ];
+        }
+
+        function draw() {
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+            // Bench
+            const g = ctx.createLinearGradient(0, 0, 0, h);
+            g.addColorStop(0, '#1b2434'); g.addColorStop(1, '#0a1220');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+            // Jig base plate
+            ctx.fillStyle = '#2d3f5d';
+            roundRectPath(ctx, JIG.cx - JIG.w / 2 - 30, JIG.cy - JIG.h / 2 - 30, JIG.w + 60, JIG.h + 60, 12); ctx.fill();
+            ctx.strokeStyle = 'rgba(160,180,210,0.35)'; ctx.lineWidth = 2; ctx.stroke();
+            // Nominal chassis outline (ghost)
+            ctx.save();
+            ctx.translate(JIG.cx, JIG.cy);
+            ctx.strokeStyle = 'rgba(62,207,113,0.4)'; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5;
+            roundRectPath(ctx, -JIG.w / 2, -JIG.h / 2, JIG.w, JIG.h, 18); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+            // Pegs
+            const pegs = jigPegs();
+            const pc = cornersOfPhone();
+            pegs.forEach((p, i) => {
+                const d = Math.hypot(p.x - pc[i].x, p.y - pc[i].y);
+                const ok = d <= TOL_POS;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+                ctx.fillStyle = '#0a1220'; ctx.fill();
+                ctx.strokeStyle = ok ? '#4ade80' : '#f87171'; ctx.lineWidth = 3; ctx.stroke();
+                ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = ok ? '#4ade80' : '#f87171'; ctx.fill();
+            });
+            // Phone chassis (draggable)
+            ctx.save();
+            ctx.translate(phone.cx, phone.cy);
+            ctx.rotate(phone.rot * Math.PI / 180);
+            const bodyGrad = ctx.createLinearGradient(-JIG.w / 2, 0, JIG.w / 2, 0);
+            bodyGrad.addColorStop(0, '#2a3850'); bodyGrad.addColorStop(0.5, '#3a4a68'); bodyGrad.addColorStop(1, '#2a3850');
+            ctx.fillStyle = bodyGrad;
+            roundRectPath(ctx, -JIG.w / 2, -JIG.h / 2, JIG.w, JIG.h, 18); ctx.fill();
+            ctx.strokeStyle = 'rgba(200,215,240,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+            // Screen area
+            ctx.fillStyle = '#050a14';
+            roundRectPath(ctx, -JIG.w / 2 + 8, -JIG.h / 2 + 12, JIG.w - 16, JIG.h - 24, 12); ctx.fill();
+            // Dynamic island
+            ctx.fillStyle = '#0a0a0a';
+            roundRectPath(ctx, -22, -JIG.h / 2 + 18, 44, 10, 5); ctx.fill();
+            ctx.restore();
+            // Update corner indicators
+            const deltas = pegs.map((p, i) => Math.hypot(p.x - pc[i].x, p.y - pc[i].y));
+            const labels = ['tl', 'tr', 'bl', 'br'];
+            cornerEls.forEach((el, i) => {
+                const d = deltas[i];
+                const ok = d <= TOL_POS;
+                el.classList.toggle('ok', ok);
+                el.classList.toggle('bad', !ok);
+                el.querySelector('span').textContent = `Δ ${d.toFixed(1)} px`;
+            });
+            const rotOk = Math.abs(phone.rot) <= TOL_ROT;
+            const allOk = deltas.every(d => d <= TOL_POS) && rotOk;
+            lockBtn.disabled = !allOk || locked;
+            return { deltas, rotOk, allOk };
+        }
+
+        // Drag handlers
+        canvas.addEventListener('mousedown', (e) => {
+            if (locked) return;
+            const rect = canvas.getBoundingClientRect();
+            const mx = (e.clientX - rect.left) * canvas.width / rect.width;
+            const my = (e.clientY - rect.top)  * canvas.height / rect.height;
+            const rad = -phone.rot * Math.PI / 180;
+            const lx = (mx - phone.cx) * Math.cos(rad) - (my - phone.cy) * Math.sin(rad);
+            const ly = (mx - phone.cx) * Math.sin(rad) + (my - phone.cy) * Math.cos(rad);
+            if (Math.abs(lx) <= JIG.w / 2 && Math.abs(ly) <= JIG.h / 2) {
+                dragging = true;
+                dragOff = { x: mx - phone.cx, y: my - phone.cy };
+            }
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const rect = canvas.getBoundingClientRect();
+            const mx = (e.clientX - rect.left) * canvas.width / rect.width;
+            const my = (e.clientY - rect.top)  * canvas.height / rect.height;
+            phone.cx = mx - dragOff.x;
+            phone.cy = my - dragOff.y;
+            draw();
+        });
+        window.addEventListener('mouseup', () => { dragging = false; });
+
+        slider.addEventListener('input', () => {
+            phone.rot = parseFloat(slider.value);
+            rotValEl.textContent = phone.rot.toFixed(1) + '°';
+            draw();
+        });
+
+        lockBtn.addEventListener('click', () => {
+            if (locked) return;
+            locked = true;
+            attempts++;
+            const { deltas } = draw();
+            const maxDelta = Math.max(...deltas);
+            const rotErr = Math.abs(phone.rot);
+            // Score: 100 when perfect, drops with residual error
+            const posScore = Math.max(0, 100 - (maxDelta / TOL_POS) * 40);
+            const rotScore = Math.max(0, 100 - (rotErr / TOL_ROT) * 40);
+            const score = Math.max(0, Math.round((posScore * 0.7 + rotScore * 0.3) - (attempts - 1) * 5));
+            const passed = maxDelta <= TOL_POS && rotErr <= TOL_ROT;
+            bestScore = Math.max(bestScore, score);
+            const line = document.createElement('div');
+            line.className = 'tcal-log-line ' + (passed ? 'ok' : 'bad');
+            line.innerHTML = `${passed ? '✓' : '✗'} Attempt ${attempts}: max corner Δ ${maxDelta.toFixed(1)} px · rotation ${rotErr.toFixed(1)}°`;
+            log.appendChild(line);
+            const wrap = document.createElement('div');
+            wrap.className = 'esd-summary';
+            wrap.innerHTML = `
+                <div class="esd-summary-score" style="color:${barColor(score)}">${score}</div>
+                <div class="esd-summary-label">${passed ? 'Jig clamped cleanly' : 'Jig rejected — realign'}</div>
+                <button class="btn btn-primary jig-retry">Retry</button>
+                <button class="btn btn-success jig-submit">Submit Score</button>
+            `;
+            body.querySelector('.jig-panel').appendChild(wrap);
+            wrap.querySelector('.jig-retry').addEventListener('click', () => resetMission(m.id));
+            wrap.querySelector('.jig-submit').addEventListener('click', () => completeMission(m.id, score, passed));
+        });
+
+        if (state.done) {
+            // Show clamped ideal state
+            phone = { cx: JIG.cx, cy: JIG.cy, rot: 0 };
+            slider.value = 0; slider.disabled = true;
+            rotValEl.textContent = '0.0°';
+            draw();
+            locked = true;
+            const wrap = document.createElement('div');
+            wrap.className = 'esd-summary';
+            wrap.innerHTML = `
+                <div class="esd-summary-score" style="color:${barColor(state.score)}">${state.score}</div>
+                <div class="esd-summary-label">Completed · retry to improve</div>
+                <button class="btn btn-primary jig-retry">Retry Mission</button>
+            `;
+            body.querySelector('.jig-panel').appendChild(wrap);
+            wrap.querySelector('.jig-retry').addEventListener('click', () => resetMission(m.id));
+        } else {
+            draw();
         }
     }
 

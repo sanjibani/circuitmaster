@@ -1541,3 +1541,221 @@ canvas {
 .msd-log-line.ok { color: #4ade80; padding: 2px 0; }
 .msd-log-line.bad { color: #ff9090; padding: 2px 0; }
 
+/* ── 5S Workstation Audit — Spot-the-Violation ─────────────────────────── */
+.fives-mission { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(260px, 1fr); gap: 16px; }
+.fives-scene {
+    position: relative;
+    background: linear-gradient(160deg, #171f2e, #0b1120);
+    border: 1px solid rgba(100, 120, 150, 0.25);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.fives-canvas { display: block; width: 100%; height: auto; }
+.fives-hotspots { position: absolute; inset: 0; }
+.fives-spot {
+    position: absolute;
+    background: transparent;
+    border: 1.5px dashed rgba(200, 215, 240, 0.25);
+    border-radius: 6px;
+    cursor: pointer;
+    color: transparent;
+    padding: 0;
+    transition: all 0.15s;
+}
+.fives-spot:hover { border-color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.05); }
+.fives-spot .fs-label {
+    position: absolute;
+    left: 50%; top: 100%;
+    transform: translate(-50%, 4px);
+    white-space: nowrap;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #c8d0dc;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 2px 6px;
+    border-radius: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+.fives-spot:hover .fs-label { opacity: 1; }
+.fives-spot.flagged { border: 2px solid #facc15; background: rgba(250, 204, 21, 0.15); }
+.fives-spot.flagged .fs-label { opacity: 1; color: #facc15; }
+.fives-spot.tp { border: 2px solid #4ade80; background: rgba(62, 207, 113, 0.2); }
+.fives-spot.fn { border: 2px solid #f87171; background: rgba(248, 113, 113, 0.25); animation: fsBlink 0.8s ease-in-out 2; }
+.fives-spot.fp { border: 2px solid #fb923c; background: rgba(251, 146, 60, 0.2); }
+.fives-spot.tn { opacity: 0.5; border-style: dotted; }
+.fives-spot.tp .fs-label, .fives-spot.fn .fs-label, .fives-spot.fp .fs-label { opacity: 1; }
+@keyframes fsBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.fives-panel {
+    display: flex; flex-direction: column; gap: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(100, 120, 150, 0.18);
+    border-radius: 10px;
+    padding: 14px;
+}
+.fives-legend { font-size: 10px; color: #8fa0b8; line-height: 1.5; }
+.fives-legend strong { color: #c8d0dc; }
+.fives-instr { font-size: 11px; color: #c8d0dc; line-height: 1.5; }
+.fives-counter { font-size: 12px; color: #ffb060; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.fives-submit { width: 100%; }
+.fives-log {
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+.fives-log:empty { display: none; }
+.fives-log-line.ok { color: #4ade80; padding: 2px 0; }
+.fives-log-line.bad { color: #ff9090; padding: 2px 0; }
+
+/* ── Torque Calibration — Dial-the-Needle ──────────────────────────────── */
+.tcal-mission { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(260px, 1fr); gap: 16px; }
+.tcal-stage {
+    display: grid;
+    grid-template-columns: 1fr 160px;
+    gap: 12px;
+    background: linear-gradient(160deg, #171f2e, #0b1120);
+    border: 1px solid rgba(100, 120, 150, 0.25);
+    border-radius: 10px;
+    padding: 14px;
+}
+.tcal-dial { display: block; width: 100%; max-width: 360px; border-radius: 6px; }
+.tcal-readout {
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    display: flex; flex-direction: column; gap: 6px;
+}
+.tcal-row { display: flex; justify-content: space-between; gap: 8px; }
+.tcal-lbl { color: #8fa0b8; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; }
+.tcal-fast, .tcal-spec, .tcal-cur, .tcal-round { color: #c8d0dc; font-weight: 700; text-align: right; }
+.tcal-cur { color: #ffe16b; font-size: 13px; }
+.tcal-hint-text { font-size: 10px; color: #8fa0b8; line-height: 1.5; margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); }
+.tcal-controls {
+    display: flex; flex-direction: column; gap: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(100, 120, 150, 0.18);
+    border-radius: 10px;
+    padding: 14px;
+}
+.tcal-slider-label { font-size: 10px; color: #8fa0b8; text-transform: uppercase; letter-spacing: 0.06em; }
+.tcal-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 8px;
+    background: linear-gradient(90deg, #1a2234, #2a3f5a, #1a2234);
+    border-radius: 4px;
+    outline: none;
+}
+.tcal-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #ffe16b;
+    border: 2px solid #3a2a00;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(255, 225, 107, 0.5);
+}
+.tcal-slider::-moz-range-thumb {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #ffe16b;
+    border: 2px solid #3a2a00;
+    cursor: pointer;
+}
+.tcal-btns { display: flex; gap: 8px; }
+.tcal-btns .btn { flex: 1; }
+.tcal-log {
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    max-height: 140px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+.tcal-log:empty { display: none; }
+.tcal-log-line.ok { color: #4ade80; padding: 2px 0; }
+.tcal-log-line.bad { color: #ff9090; padding: 2px 0; }
+
+/* ── JIG & Fixture Setup — Snap-Fit Alignment ──────────────────────────── */
+.jig-mission { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, 1fr); gap: 16px; }
+.jig-stage {
+    background: linear-gradient(160deg, #171f2e, #0b1120);
+    border: 1px solid rgba(100, 120, 150, 0.25);
+    border-radius: 10px;
+    padding: 10px;
+}
+.jig-canvas { display: block; width: 100%; height: auto; border-radius: 6px; cursor: grab; }
+.jig-canvas:active { cursor: grabbing; }
+.jig-panel {
+    display: flex; flex-direction: column; gap: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(100, 120, 150, 0.18);
+    border-radius: 10px;
+    padding: 14px;
+}
+.jig-instr { font-size: 11px; color: #c8d0dc; line-height: 1.55; }
+.jig-rot { display: flex; flex-direction: column; gap: 4px; }
+.jig-rot label { font-size: 10px; color: #8fa0b8; text-transform: uppercase; letter-spacing: 0.06em; }
+.jig-rot-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #2a3f5a;
+    border-radius: 3px;
+    outline: none;
+}
+.jig-rot-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #60a5fa; border: 2px solid #0a1020; cursor: pointer;
+}
+.jig-rot-slider::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #60a5fa; border: 2px solid #0a1020; cursor: pointer;
+}
+.jig-rot-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #60a5fa; text-align: right; }
+.jig-corners { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.jig-corner {
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(100, 120, 150, 0.2);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #8fa0b8;
+    display: flex; justify-content: space-between;
+    font-weight: 700;
+}
+.jig-corner span { color: #c8d0dc; }
+.jig-corner.ok { border-color: rgba(62, 207, 113, 0.6); background: rgba(62, 207, 113, 0.1); color: #4ade80; }
+.jig-corner.ok span { color: #4ade80; }
+.jig-corner.bad { border-color: rgba(248, 113, 113, 0.55); background: rgba(248, 113, 113, 0.08); color: #ff9090; }
+.jig-corner.bad span { color: #ff9090; }
+.jig-lock { width: 100%; }
+.jig-log {
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+.jig-log:empty { display: none; }
+
+@media (max-width: 900px) {
+    .fives-mission, .tcal-mission, .jig-mission { grid-template-columns: 1fr; }
+}
+
