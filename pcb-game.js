@@ -25,7 +25,7 @@ const pcbGame = (() => {
 
     const challenges = [
         {
-            name: 'LED Circuit',
+            name: '💡 LED Circuit',
             // required order MUST match checklist text order (first N items)
             required: ['battery', 'switch', 'resistor', 'led'],
             connections: [
@@ -39,7 +39,7 @@ const pcbGame = (() => {
             schematic: 'BAT+ -- SW -- R -- LED+ -- LED- -- BAT-'
         },
         {
-            name: 'Sensor Module',
+            name: '🎛️ Sensor Module',
             // Checklist: battery, potentiometer, transistor, resistor, LED
             required: ['battery', 'potentiometer', 'transistor', 'resistor', 'led'],
             connections: [
@@ -55,7 +55,7 @@ const pcbGame = (() => {
             schematic: 'BAT+ -- POT -- Q(base)\nQ(collector) -- R -- LED -- BAT-'
         },
         {
-            name: 'Audio Amplifier',
+            name: '🔊 Audio Amplifier',
             // Checklist: IC, battery, capacitor, capacitor, resistor (x2)
             required: ['ic', 'battery', 'capacitor', 'capacitor', 'resistor'],
             connections: [
@@ -69,6 +69,176 @@ const pcbGame = (() => {
             checklist: ['Place the IC (amplifier chip)', 'Place the battery', 'Place input coupling capacitor', 'Place output coupling capacitor', 'Place feedback resistors (x2)', 'Connect power to IC', 'Wire input stage', 'Wire output and feedback'],
             hint: 'The IC amplifies the signal from input to output. Capacitors block DC, resistors set the gain.',
             schematic: 'IN -- C1 -- IC(in) ... IC(out) -- C2 -- OUT\nR1,R2 as feedback'
+        },
+
+        // ────────────────────────────────────────────────────────────────────
+        // Real-world Indian use cases — circuits you see in every home & street
+        // ────────────────────────────────────────────────────────────────────
+        {
+            name: '🌧️ Monsoon Rain Alarm',
+            story: 'Your clothes are drying on the balcony and the sky turns grey. This circuit screams the moment rain touches the sensor probes — so you can rescue the washing before Ma shouts.',
+            bom: '₹45 · Used in: homes, rooftop tanks, terrace gardens',
+            required: ['battery', 'switch', 'transistor', 'resistor', 'led'],
+            connections: [
+                ['battery:0', 'switch:0'],
+                ['switch:1', 'transistor:1'],
+                ['transistor:0', 'resistor:0'],
+                ['resistor:1', 'led:0'],
+                ['led:1', 'battery:1'],
+                ['transistor:2', 'battery:1']
+            ],
+            checklist: [
+                'Place a 9V battery (power)',
+                'Place a switch (rain-sensor probes)',
+                'Place a transistor (amplifier)',
+                'Place a current-limit resistor',
+                'Place the alarm LED',
+                'Wire battery + to sensor',
+                'Sensor output → transistor base',
+                'Transistor collector → resistor',
+                'Resistor → LED anode',
+                'LED cathode → battery -',
+                'Transistor emitter → battery -'
+            ],
+            hint: 'The two sensor probes sit on the balcony. When a raindrop bridges them, water conducts enough current into the transistor base to switch it ON — the LED (or buzzer on a real build) fires and you dash out to save the washing.',
+            schematic: 'BAT+ -- PROBES -- Q(base)\nBAT+ -- R -- LED -- Q(collector)\nQ(emitter) -- BAT-'
+        },
+        {
+            name: '🪔 Diwali LED Diya',
+            story: 'Real oil diyas are beautiful but risky around kids and curtains. Build a 555 astable that makes a warm LED flicker like a real flame — line them along the balcony this Diwali.',
+            bom: '₹60 · Used in: festive lighting, rangoli decor, puja rooms',
+            required: ['battery', 'ic', 'capacitor', 'resistor', 'led'],
+            connections: [
+                ['battery:0', 'ic:0'],
+                ['ic:1', 'battery:1'],
+                ['resistor:0', 'ic:0'],
+                ['resistor:1', 'ic:2'],
+                ['capacitor:0', 'ic:2'],
+                ['capacitor:1', 'battery:1'],
+                ['ic:3', 'led:0'],
+                ['led:1', 'battery:1']
+            ],
+            checklist: [
+                'Place the NE555 timer IC',
+                'Place a 9V battery',
+                'Place the timing capacitor',
+                'Place the timing resistor',
+                'Place the diya LED',
+                'VCC: battery + → IC pin 8',
+                'GND: IC pin 1 → battery -',
+                'Timing resistor → charge path',
+                'Timing resistor → threshold pin',
+                'Timing capacitor → trigger pin',
+                'Capacitor → ground',
+                'IC output → LED anode',
+                'LED cathode → battery -'
+            ],
+            hint: 'NE555 in astable mode: the capacitor charges through the resistor, then discharges through pin 7. Blink rate = 1.44 / ((R1+2·R2)·C). Pick C = 10µF and R = 47kΩ for a candle-flicker speed of ~2 Hz.',
+            schematic: 'BAT+ -- VCC(8)  GND(1) -- BAT-\nR -- THRES(6) -- TRIG(2) -- C -- GND\nOUT(3) -- LED -- BAT-'
+        },
+        {
+            name: '🔌 Mobile USB Charger',
+            story: 'The charger brick you plug in every night. Inside: a regulator IC, smoothing caps and a power-indicator LED. Build the output stage — the exact thing that keeps your phone alive during 4 G streaming.',
+            bom: '₹80 · Used in: every phone charger, power bank, set-top box',
+            required: ['battery', 'ic', 'capacitor', 'capacitor', 'resistor', 'led'],
+            connections: [
+                ['battery:0', 'ic:0'],
+                ['ic:1', 'battery:1'],
+                ['capacitor:0', 'ic:0'],
+                ['capacitor:1', 'battery:1'],
+                ['ic:2', 'capacitor:0'],
+                ['ic:3', 'capacitor:1'],
+                ['ic:2', 'resistor:0'],
+                ['resistor:1', 'led:0'],
+                ['led:1', 'battery:1']
+            ],
+            checklist: [
+                'Place the 7805 regulator IC',
+                'Place the raw DC source (battery)',
+                'Place input smoothing cap',
+                'Place output smoothing cap',
+                'Place the power-indicator resistor',
+                'Place the power LED',
+                'Raw DC + → regulator input',
+                'Regulator ground → battery -',
+                'Input cap across input → GND',
+                'Output cap across output → GND',
+                'Regulator output → resistor',
+                'Regulator GND → cap → GND',
+                'Resistor → LED anode',
+                'LED cathode → battery -'
+            ],
+            hint: 'A 7805 linear regulator takes 9–12 V DC and outputs a rock-steady 5 V. The input cap kills ripple from the bridge rectifier; the output cap kills fast transients when your phone pulls sudden current. The LED tells you the charger is live.',
+            schematic: 'RAW+ -- Cin -- 7805(IN) ... 7805(OUT) -- Cout -- 5V\n5V -- R -- LED -- GND'
+        },
+        {
+            name: '🛎️ Apartment Doorbell',
+            story: 'The classic "ding" of every Indian flat door. A push switch triggers a 555 monostable, which fires a single tone pulse to the speaker (LED here). Visitors press it a hundred times — your circuit only chimes once per press.',
+            bom: '₹90 · Used in: apartments, office reception, school bells',
+            required: ['battery', 'switch', 'ic', 'capacitor', 'resistor', 'led'],
+            connections: [
+                ['battery:0', 'ic:0'],
+                ['ic:1', 'battery:1'],
+                ['switch:0', 'battery:0'],
+                ['switch:1', 'ic:2'],
+                ['resistor:0', 'ic:0'],
+                ['resistor:1', 'ic:3'],
+                ['capacitor:0', 'ic:3'],
+                ['capacitor:1', 'battery:1'],
+                ['ic:3', 'led:0'],
+                ['led:1', 'battery:1']
+            ],
+            checklist: [
+                'Place a 9V battery',
+                'Place the doorbell push switch',
+                'Place the NE555 IC',
+                'Place the timing capacitor',
+                'Place the timing resistor',
+                'Place the chime LED (speaker sim)',
+                'VCC: battery + → IC',
+                'GND: IC → battery -',
+                'Switch one side → VCC',
+                'Switch other side → trigger pin',
+                'Timing resistor → VCC',
+                'Timing resistor → discharge',
+                'Capacitor → discharge',
+                'Capacitor → GND',
+                'IC output → LED',
+                'LED → battery -'
+            ],
+            hint: 'NE555 in monostable mode: pressing the switch pulls the trigger pin low, output goes HIGH for t = 1.1 · R · C seconds, then returns LOW automatically. Use R = 100 kΩ and C = 10 µF for a ~1 s chime — long enough to be noticed, short enough to not annoy the neighbours.',
+            schematic: 'SW -- TRIG(2) -- 555\nR -- DISCH(7) -- THRES(6) -- C -- GND\nOUT(3) -- LED -- GND'
+        },
+        {
+            name: '🔋 Inverter Low-Battery Alarm',
+            story: 'Every Indian home with a UPS/inverter has one. When the lead-acid battery voltage sags below 10.5 V, this circuit lights up a warning so you can shut down the TV before deep-discharge kills the battery for good.',
+            bom: '₹55 · Used in: inverters, solar banks, UPS, e-rickshaws',
+            required: ['battery', 'potentiometer', 'transistor', 'resistor', 'led'],
+            connections: [
+                ['battery:0', 'potentiometer:0'],
+                ['potentiometer:1', 'battery:1'],
+                ['potentiometer:2', 'transistor:1'],
+                ['transistor:0', 'resistor:0'],
+                ['resistor:1', 'led:0'],
+                ['led:1', 'battery:1'],
+                ['transistor:2', 'battery:1']
+            ],
+            checklist: [
+                'Place the inverter battery',
+                'Place the threshold pot (sets cut-off voltage)',
+                'Place the transistor (comparator sim)',
+                'Place the LED current-limit resistor',
+                'Place the warning LED',
+                'Battery + → pot top',
+                'Pot bottom → battery -',
+                'Pot wiper → transistor base',
+                'Transistor collector → resistor',
+                'Resistor → LED anode',
+                'LED cathode → battery -',
+                'Transistor emitter → battery -'
+            ],
+            hint: 'The potentiometer forms a voltage divider sampling the battery. Set the wiper so the transistor base sees ~0.65 V when the battery is at your warning threshold (e.g. 10.5 V). As the battery sags, the divider output drops — invert the logic with a second stage in a real build, or swap to a PNP for on-low-voltage behaviour.',
+            schematic: 'BAT+ -- POT -- BAT-\nPOT(wiper) -- Q(base)\nQ(collector) -- R -- LED -- BAT-'
         }
     ];
 
@@ -76,8 +246,23 @@ const pcbGame = (() => {
         canvas = document.getElementById('pcb-canvas');
         ctx = canvas.getContext('2d');
         resizeCanvas();
+        populateChallengeDropdown();
         loadChallenge(0);
         setupEvents();
+    }
+
+    // Rebuild the challenge <select> from the challenges array so new
+    // challenges added in this file show up without editing index.html.
+    function populateChallengeDropdown() {
+        const sel = document.getElementById('pcb-challenge');
+        if (!sel) return;
+        sel.innerHTML = '';
+        challenges.forEach((ch, i) => {
+            const opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = `Challenge ${i + 1}: ${ch.name}`;
+            sel.appendChild(opt);
+        });
     }
 
     function resizeCanvas() {
@@ -143,8 +328,15 @@ const pcbGame = (() => {
             checklist.innerHTML += `<div class="check-item" id="pcb-check-${i}"><div class="check-mark"></div><span>${text}</span></div>`;
         });
 
-        // Hints
-        document.getElementById('pcb-hints').innerHTML = `<div class="hint-text">${ch.hint}</div>`;
+        // Hints (with optional real-world story + BOM cost line)
+        const storyBlock = ch.story
+            ? `<div class="pcb-story">
+                   <div class="pcb-story-title">${ch.name} — Real-World Use</div>
+                   <div class="pcb-story-text">${ch.story}</div>
+                   ${ch.bom ? `<div class="pcb-story-bom">${ch.bom}</div>` : ''}
+               </div>`
+            : '';
+        document.getElementById('pcb-hints').innerHTML = `${storyBlock}<div class="hint-text">${ch.hint}</div>`;
 
         // Schematic
         document.getElementById('schematic-preview').innerHTML = `<h4>Schematic</h4><pre style="font-size:10px;color:var(--accent-blue);white-space:pre-wrap">${ch.schematic}</pre>`;
