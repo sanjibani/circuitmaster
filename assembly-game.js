@@ -250,6 +250,9 @@ const assemblyGame = (() => {
         currentStep = 0;
         score = 0;
         elapsedSeconds = 0;
+        document.dispatchEvent(new CustomEvent('assembly:reset', {
+            detail: { modelIdx: currentModel, modelName: model.name, total: model.parts.length }
+        }));
         if (timerInterval) clearInterval(timerInterval);
         document.getElementById('assembly-score').textContent = '0';
         document.getElementById('assembly-time').textContent = '0:00';
@@ -266,8 +269,8 @@ const assemblyGame = (() => {
             // Mini canvas icon for each part
             const iconId = `part-icon-${part.id}`;
             item.innerHTML = `
-                <div class="comp-icon" style="padding:0;overflow:hidden;border-radius:4px;">
-                    <canvas id="${iconId}" width="36" height="36" style="display:block;"></canvas>
+                <div class="comp-icon" style="padding:0;overflow:hidden;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                    <canvas id="${iconId}" width="40" height="32" style="display:block;width:40px;height:32px;max-width:none;max-height:none;"></canvas>
                 </div>
                 <div class="comp-info">
                     <div class="comp-name">${part.name}</div>
@@ -345,6 +348,9 @@ const assemblyGame = (() => {
                     palette.style.background = '';
                 }, 500);
             }
+            document.dispatchEvent(new CustomEvent('assembly:miss', {
+                detail: { partId, expectedOrder: currentStep, attemptedOrder: part.order }
+            }));
             return;
         }
 
@@ -367,7 +373,11 @@ const assemblyGame = (() => {
 
         const timeBonus = Math.max(0, 200 - elapsedSeconds * 2);
         score += 100 + timeBonus;
-        document.getElementById('assembly-score').textContent = score;
+        const sEl = document.getElementById('assembly-score');
+        sEl.textContent = score;
+        sEl.classList.remove('score-bump');
+        void sEl.offsetWidth;
+        sEl.classList.add('score-bump');
 
         draw();
 
@@ -377,8 +387,18 @@ const assemblyGame = (() => {
             });
         }
 
+        document.dispatchEvent(new CustomEvent('assembly:placed', {
+            detail: {
+                partId, part, currentStep, total: model.parts.length,
+                elapsed: elapsedSeconds, score
+            }
+        }));
+
         if (currentStep >= model.parts.length) {
             clearInterval(timerInterval);
+            document.dispatchEvent(new CustomEvent('assembly:complete', {
+                detail: { total: model.parts.length, elapsed: elapsedSeconds, score }
+            }));
         }
     }
 
@@ -1389,5 +1409,18 @@ const assemblyGame = (() => {
         };
     }
 
-    return { init, resizeCanvas, loadModel, testPhone, reset, getTutorialAPI };
+    function getState() {
+        const model = PHONE_MODELS[currentModel];
+        return {
+            modelIdx: currentModel,
+            modelName: model.name,
+            currentStep,
+            total: model.parts.length,
+            placedParts: [...placedParts],
+            elapsed: elapsedSeconds,
+            score,
+        };
+    }
+
+    return { init, resizeCanvas, loadModel, testPhone, reset, getTutorialAPI, getState };
 })();

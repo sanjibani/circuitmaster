@@ -105,13 +105,19 @@ const smtGame = (() => {
             const item = document.createElement('div');
             item.className = 'palette-item selected';
             item.innerHTML = `
-                <div class="comp-icon" style="background:#c0c0c033;color:#c0c0c0">SP</div>
+                <div class="comp-icon" style="background:#c0c0c01a;padding:0;overflow:hidden;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                    <canvas id="smt-icon-sp" width="40" height="32" style="display:block;width:40px;height:32px;max-width:none;max-height:none;"></canvas>
+                </div>
                 <div class="comp-info">
                     <div class="comp-name">Solder Paste</div>
                     <div class="comp-detail">Click each pad</div>
                 </div>
             `;
             palette.appendChild(item);
+            setTimeout(() => {
+                const mc = document.getElementById('smt-icon-sp');
+                if (mc) drawSmtMiniIcon(mc, 'solderpaste');
+            }, 0);
         } else if (phase === 1) {
             // Pick & place phase - show components
             const placedTypes = placedSMDs.map(p => p.type);
@@ -124,13 +130,20 @@ const smtGame = (() => {
                     item.style.opacity = '0.3';
                     item.style.pointerEvents = 'none';
                 }
+                const iconId = `smt-icon-${i}`;
                 item.innerHTML = `
-                    <div class="comp-icon" style="background:${SMD_COLORS[pad.type]}33;color:${SMD_COLORS[pad.type]}">${pad.type[0].toUpperCase()}</div>
+                    <div class="comp-icon" style="background:${SMD_COLORS[pad.type]}1a;padding:0;overflow:hidden;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                        <canvas id="${iconId}" width="40" height="32" style="display:block;width:40px;height:32px;max-width:none;max-height:none;"></canvas>
+                    </div>
                     <div class="comp-info">
                         <div class="comp-name">${pad.label}</div>
                         <div class="comp-detail">${pad.type}</div>
                     </div>
                 `;
+                setTimeout(() => {
+                    const mc = document.getElementById(iconId);
+                    if (mc) drawSmtMiniIcon(mc, pad.type);
+                }, 0);
                 item.onclick = () => {
                     if (!alreadyPlaced) {
                         selectedComp = i;
@@ -383,60 +396,41 @@ const smtGame = (() => {
             }
         });
 
-        // Draw pads
+        // Draw pads as realistic SMD footprints (copper lands + silkscreen)
         board.pads.forEach(pad => {
-            // Copper pad
-            ctx.fillStyle = padsWithPaste.has(pad.id) ? '#c0c0c0' : '#b87333';
-            roundRect(ctx, pad.x, pad.y, pad.w, pad.h, 3);
-            ctx.fill();
+            const hasPaste = padsWithPaste.has(pad.id);
+            const isPlaced = placedSMDs.some(p => p.padId === pad.id);
+            drawPadFootprint(ctx, pad, hasPaste, isPlaced);
 
-            // Solder paste overlay
-            if (padsWithPaste.has(pad.id) && phase <= 1) {
-                ctx.fillStyle = 'rgba(192, 192, 192, 0.6)';
-                roundRect(ctx, pad.x + 2, pad.y + 2, pad.w - 4, pad.h - 4, 2);
-                ctx.fill();
-            }
-
-            // Pad label (silkscreen)
-            ctx.fillStyle = '#fff';
-            ctx.font = '9px monospace';
+            // Silkscreen reference designator above footprint
+            ctx.fillStyle = '#e8e8e8';
+            ctx.font = 'bold 9px "JetBrains Mono", monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(pad.label, pad.x + pad.w / 2, pad.y - 5);
+            ctx.textBaseline = 'alphabetic';
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 2;
+            ctx.fillText(pad.label, pad.x + pad.w / 2, pad.y - 6);
+            ctx.shadowBlur = 0;
 
-            // Outline for pad
-            ctx.strokeStyle = phase === 0 && !padsWithPaste.has(pad.id) ? '#ff9100' :
-                             phase === 1 && !placedSMDs.some(p => p.padId === pad.id) ? '#00e676' : '#4a6a4a';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(pad.x - 1, pad.y - 1, pad.w + 2, pad.h + 2);
+            // Highlight outline when the pad needs action
+            const needsPaste = phase === 0 && !hasPaste;
+            const needsPlace = phase === 1 && !isPlaced;
+            if (needsPaste || needsPlace) {
+                ctx.strokeStyle = needsPaste ? 'rgba(255,145,0,0.55)' : 'rgba(0,230,118,0.55)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.strokeRect(pad.x - 3, pad.y - 3, pad.w + 6, pad.h + 6);
+                ctx.setLineDash([]);
+            }
         });
 
-        // Draw placed SMD components
+        // Draw placed SMD components with realistic package rendering
         placedSMDs.forEach(smd => {
             const pad = board.pads.find(p => p.id === smd.padId);
             if (!pad) return;
-
-            ctx.fillStyle = SMD_COLORS[smd.type] || '#444';
-            ctx.globalAlpha = reflowed ? 1 : 0.85;
-            roundRect(ctx, smd.x, smd.y, pad.w, pad.h, 2);
-            ctx.fill();
-
-            // Component marking
-            ctx.fillStyle = '#888';
-            ctx.font = 'bold 8px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText(smd.type[0].toUpperCase(), smd.x + pad.w / 2, smd.y + pad.h / 2 + 3);
+            ctx.globalAlpha = reflowed ? 1 : 0.9;
+            drawPlacedSmdBody(ctx, smd, pad, reflowed);
             ctx.globalAlpha = 1;
-
-            // Solder joints after reflow
-            if (reflowed) {
-                ctx.fillStyle = '#c0c0c0';
-                ctx.beginPath();
-                ctx.arc(smd.x + 3, smd.y + pad.h / 2, 3, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(smd.x + pad.w - 3, smd.y + pad.h / 2, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
         });
 
         // Hover highlight
@@ -465,6 +459,494 @@ const smtGame = (() => {
         ctx.font = '10px monospace';
         ctx.textAlign = 'right';
         ctx.fillText(board.name, w - 110, 115);
+    }
+
+    // ─── Realistic PCB footprint drawing (copper lands + silkscreen) ─────────
+    // Draws the footprint inside pad.x/y/w/h bounding box.
+    function drawPadFootprint(ctx, pad, hasPaste, isPlaced) {
+        const x = pad.x, y = pad.y, w = pad.w, h = pad.h;
+        const copper = '#b87333';
+        const copperLight = '#d39a5c';
+        const mask = 'rgba(26, 58, 42, 0)'; // transparent — board green shows through
+        const silk = 'rgba(235,235,235,0.55)';
+
+        ctx.save();
+        switch (pad.type) {
+            case 'resistor':
+            case 'diode': {
+                // Two terminal pads at each end, silkscreen body outline in between
+                const tw = Math.max(6, w * 0.28);
+                const th = h;
+                // Left land
+                copperPad(ctx, x, y, tw, th);
+                // Right land
+                copperPad(ctx, x + w - tw, y, tw, th);
+                // Silkscreen body outline
+                ctx.strokeStyle = silk;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + tw + 1, y + 1, w - 2 * tw - 2, h - 2);
+                // Polarity mark for diode
+                if (pad.type === 'diode') {
+                    ctx.fillStyle = silk;
+                    ctx.fillRect(x + w - tw - 3, y + 2, 1.5, h - 4);
+                }
+                if (hasPaste && !isPlaced) {
+                    pastePad(ctx, x, y, tw, th);
+                    pastePad(ctx, x + w - tw, y, tw, th);
+                }
+                break;
+            }
+            case 'capacitor': {
+                // Two square lands (chip cap 0805-style)
+                const tw = Math.max(5, w * 0.32);
+                copperPad(ctx, x, y, tw, h);
+                copperPad(ctx, x + w - tw, y, tw, h);
+                ctx.strokeStyle = silk; ctx.lineWidth = 1;
+                ctx.strokeRect(x + tw + 1, y + 1, w - 2 * tw - 2, h - 2);
+                if (hasPaste && !isPlaced) {
+                    pastePad(ctx, x, y, tw, h);
+                    pastePad(ctx, x + w - tw, y, tw, h);
+                }
+                break;
+            }
+            case 'led': {
+                // Two lands + cathode triangle silkscreen mark
+                const tw = Math.max(5, w * 0.33);
+                copperPad(ctx, x, y, tw, h);
+                copperPad(ctx, x + w - tw, y, tw, h);
+                // Cathode mark (triangle pointing to cathode = right pad)
+                ctx.fillStyle = silk;
+                ctx.beginPath();
+                ctx.moveTo(x + w / 2 - 3, y + h / 2 - 3);
+                ctx.lineTo(x + w / 2 + 3, y + h / 2);
+                ctx.lineTo(x + w / 2 - 3, y + h / 2 + 3);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = silk; ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + w / 2 + 3, y + 2); ctx.lineTo(x + w / 2 + 3, y + h - 2);
+                ctx.stroke();
+                if (hasPaste && !isPlaced) {
+                    pastePad(ctx, x, y, tw, h);
+                    pastePad(ctx, x + w - tw, y, tw, h);
+                }
+                break;
+            }
+            case 'ic': {
+                // SOIC — copper fingers on left/right, body outline in middle, pin-1 dot
+                const pinCount = 4;
+                const pinW = Math.max(3, w * 0.12);
+                const pinH = Math.max(3, h / (pinCount + 1));
+                const gap = (h - pinCount * pinH) / (pinCount + 1);
+                for (let i = 0; i < pinCount; i++) {
+                    const py = y + gap + i * (pinH + gap);
+                    copperPad(ctx, x, py, pinW, pinH);
+                    copperPad(ctx, x + w - pinW, py, pinW, pinH);
+                    if (hasPaste && !isPlaced) {
+                        pastePad(ctx, x, py, pinW, pinH);
+                        pastePad(ctx, x + w - pinW, py, pinW, pinH);
+                    }
+                }
+                // Silkscreen body outline + pin-1 dot
+                ctx.strokeStyle = silk; ctx.lineWidth = 1;
+                ctx.strokeRect(x + pinW + 1, y + 1, w - 2 * pinW - 2, h - 2);
+                ctx.fillStyle = silk;
+                ctx.beginPath(); ctx.arc(x + pinW + 4, y + 5, 1.2, 0, Math.PI * 2); ctx.fill();
+                break;
+            }
+            case 'qfp': {
+                // QFP — copper fingers on all 4 sides + thermal pad
+                const pinCount = 6;
+                const pinSize = Math.max(3, Math.min(w, h) * 0.08);
+                const avail = Math.min(w, h) - pinSize * 2 - 8;
+                const step = avail / (pinCount - 1);
+                for (let i = 0; i < pinCount; i++) {
+                    const t = pinSize + 4 + i * step;
+                    // Left
+                    copperPad(ctx, x, y + t - pinSize / 2, pinSize, pinSize);
+                    // Right
+                    copperPad(ctx, x + w - pinSize, y + t - pinSize / 2, pinSize, pinSize);
+                    // Top
+                    copperPad(ctx, x + t - pinSize / 2, y, pinSize, pinSize);
+                    // Bottom
+                    copperPad(ctx, x + t - pinSize / 2, y + h - pinSize, pinSize, pinSize);
+                    if (hasPaste && !isPlaced) {
+                        pastePad(ctx, x, y + t - pinSize / 2, pinSize, pinSize);
+                        pastePad(ctx, x + w - pinSize, y + t - pinSize / 2, pinSize, pinSize);
+                        pastePad(ctx, x + t - pinSize / 2, y, pinSize, pinSize);
+                        pastePad(ctx, x + t - pinSize / 2, y + h - pinSize, pinSize, pinSize);
+                    }
+                }
+                // Thermal pad in center
+                const tpw = w * 0.4, tph = h * 0.4;
+                copperPad(ctx, x + (w - tpw) / 2, y + (h - tph) / 2, tpw, tph);
+                if (hasPaste && !isPlaced) pastePad(ctx, x + (w - tpw) / 2, y + (h - tph) / 2, tpw, tph);
+                // Silkscreen body + pin-1 dot
+                ctx.strokeStyle = silk; ctx.lineWidth = 1;
+                ctx.strokeRect(x + pinSize + 1, y + pinSize + 1, w - 2 * pinSize - 2, h - 2 * pinSize - 2);
+                ctx.fillStyle = silk;
+                ctx.beginPath(); ctx.arc(x + pinSize + 5, y + pinSize + 5, 1.5, 0, Math.PI * 2); ctx.fill();
+                break;
+            }
+            case 'crystal': {
+                // HC-49 crystal — 2 larger lands + rounded silkscreen outline
+                const tw = Math.max(6, w * 0.28);
+                copperPad(ctx, x, y, tw, h);
+                copperPad(ctx, x + w - tw, y, tw, h);
+                ctx.strokeStyle = silk; ctx.lineWidth = 1;
+                roundRect(ctx, x + tw + 1, y + 1, w - 2 * tw - 2, h - 2, 4);
+                ctx.stroke();
+                if (hasPaste && !isPlaced) {
+                    pastePad(ctx, x, y, tw, h);
+                    pastePad(ctx, x + w - tw, y, tw, h);
+                }
+                break;
+            }
+            case 'connector': {
+                // USB-C / header — row of rectangular pads
+                const pinCount = 6;
+                const pinW = (w - (pinCount + 1) * 2) / pinCount;
+                const pinH = h * 0.55;
+                for (let i = 0; i < pinCount; i++) {
+                    const px = x + 2 + i * (pinW + 2);
+                    copperPad(ctx, px, y + h - pinH - 2, pinW, pinH);
+                    if (hasPaste && !isPlaced) pastePad(ctx, px, y + h - pinH - 2, pinW, pinH);
+                }
+                // Mounting tabs (larger plated rectangles at each end)
+                copperPad(ctx, x, y, 4, h * 0.35);
+                copperPad(ctx, x + w - 4, y, 4, h * 0.35);
+                if (hasPaste && !isPlaced) {
+                    pastePad(ctx, x, y, 4, h * 0.35);
+                    pastePad(ctx, x + w - 4, y, 4, h * 0.35);
+                }
+                // Silkscreen outline
+                ctx.strokeStyle = silk; ctx.lineWidth = 1;
+                roundRect(ctx, x, y + h * 0.35, w, h * 0.6, 2);
+                ctx.stroke();
+                break;
+            }
+            default: {
+                copperPad(ctx, x, y, w, h);
+                if (hasPaste && !isPlaced) pastePad(ctx, x, y, w, h);
+            }
+        }
+        ctx.restore();
+    }
+
+    function copperPad(ctx, x, y, w, h) {
+        const grad = ctx.createLinearGradient(x, y, x, y + h);
+        grad.addColorStop(0, '#d89d57');
+        grad.addColorStop(0.5, '#b87333');
+        grad.addColorStop(1, '#8a5222');
+        ctx.fillStyle = grad;
+        roundRect(ctx, x, y, w, h, Math.min(2, Math.min(w, h) / 3));
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+
+    function pastePad(ctx, x, y, w, h) {
+        const grad = ctx.createLinearGradient(x, y, x, y + h);
+        grad.addColorStop(0, 'rgba(220,220,225,0.85)');
+        grad.addColorStop(1, 'rgba(150,150,160,0.85)');
+        ctx.fillStyle = grad;
+        const inset = Math.min(1.2, Math.min(w, h) * 0.15);
+        roundRect(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, Math.min(1.5, Math.min(w, h) / 4));
+        ctx.fill();
+    }
+
+    // Draw a realistic placed SMD component body on top of a footprint
+    function drawPlacedSmdBody(ctx, smd, pad, reflowed) {
+        const x = smd.x, y = smd.y, w = pad.w, h = pad.h;
+        const cx = x + w / 2, cy = y + h / 2;
+        ctx.save();
+        switch (smd.type) {
+            case 'resistor': {
+                const bw = w * 0.5, bh = h;
+                const bx = cx - bw / 2;
+                // silver end caps
+                ctx.fillStyle = '#c0c0c0';
+                ctx.fillRect(bx - Math.max(3, w * 0.12), y, Math.max(3, w * 0.12), bh);
+                ctx.fillRect(bx + bw, y, Math.max(3, w * 0.12), bh);
+                // black body
+                const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+                grad.addColorStop(0, '#2a2a2a'); grad.addColorStop(0.5, '#0e0e0e'); grad.addColorStop(1, '#2a2a2a');
+                ctx.fillStyle = grad;
+                ctx.fillRect(bx, y, bw, bh);
+                if (bh >= 14) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('103', cx, cy);
+                }
+                break;
+            }
+            case 'capacitor': {
+                const bw = w * 0.42, bh = h;
+                const bx = cx - bw / 2;
+                ctx.fillStyle = '#c0c0c0';
+                ctx.fillRect(bx - Math.max(3, w * 0.18), y, Math.max(3, w * 0.18), bh);
+                ctx.fillRect(bx + bw, y, Math.max(3, w * 0.18), bh);
+                const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+                grad.addColorStop(0, '#d4a373'); grad.addColorStop(0.5, '#8b5a2b'); grad.addColorStop(1, '#d4a373');
+                ctx.fillStyle = grad;
+                ctx.fillRect(bx, y, bw, bh);
+                break;
+            }
+            case 'led': {
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(x, y, w, h);
+                ctx.strokeStyle = '#888'; ctx.lineWidth = 0.5; ctx.strokeRect(x, y, w, h);
+                const r = Math.min(w, h) * 0.35;
+                const lens = ctx.createRadialGradient(cx, cy, 1, cx, cy, r);
+                lens.addColorStop(0, '#ff9a9a'); lens.addColorStop(0.6, '#ff3030'); lens.addColorStop(1, '#660000');
+                ctx.fillStyle = lens;
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+                // Cathode mark
+                ctx.fillStyle = '#00e676';
+                ctx.fillRect(x + w - 4, y + 1, 2, h - 2);
+                break;
+            }
+            case 'diode': {
+                ctx.fillStyle = '#c0c0c0';
+                ctx.fillRect(x, y + h * 0.15, 3, h * 0.7);
+                ctx.fillRect(x + w - 3, y + h * 0.15, 3, h * 0.7);
+                ctx.fillStyle = '#151515';
+                ctx.fillRect(x + 3, y, w - 6, h);
+                // Cathode stripe
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(x + w - 6, y, 2, h);
+                break;
+            }
+            case 'ic': {
+                const pad = Math.max(3, w * 0.12);
+                const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+                grad.addColorStop(0, '#3a3a3a'); grad.addColorStop(1, '#0a0a0a');
+                ctx.fillStyle = grad;
+                ctx.fillRect(x + pad, y + 1, w - 2 * pad, h - 2);
+                ctx.strokeStyle = '#555'; ctx.lineWidth = 0.5;
+                ctx.strokeRect(x + pad, y + 1, w - 2 * pad, h - 2);
+                ctx.fillStyle = '#ccc';
+                ctx.beginPath(); ctx.arc(x + pad + 4, y + 5, 1.3, 0, Math.PI * 2); ctx.fill();
+                if (w > 40 && h > 20) {
+                    ctx.fillStyle = '#888';
+                    ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('IC', cx, cy);
+                }
+                break;
+            }
+            case 'qfp': {
+                const pad = Math.max(4, Math.min(w, h) * 0.1);
+                const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+                grad.addColorStop(0, '#3a3a3a'); grad.addColorStop(1, '#0a0a0a');
+                ctx.fillStyle = grad;
+                ctx.fillRect(x + pad, y + pad, w - 2 * pad, h - 2 * pad);
+                ctx.strokeStyle = '#555'; ctx.lineWidth = 0.5;
+                ctx.strokeRect(x + pad, y + pad, w - 2 * pad, h - 2 * pad);
+                ctx.fillStyle = '#ccc';
+                ctx.beginPath(); ctx.arc(x + pad + 5, y + pad + 5, 1.5, 0, Math.PI * 2); ctx.fill();
+                if (w > 60) {
+                    ctx.fillStyle = '#888';
+                    ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('ESP32', cx, cy);
+                }
+                break;
+            }
+            case 'crystal': {
+                const grad = ctx.createLinearGradient(x, y, x, y + h);
+                grad.addColorStop(0, '#e0e0e0'); grad.addColorStop(0.5, '#a0a0a0'); grad.addColorStop(1, '#606060');
+                ctx.fillStyle = grad;
+                roundRect(ctx, x + 4, y, w - 8, h, Math.min(h / 2, 6));
+                ctx.fill();
+                ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5; ctx.stroke();
+                if (w > 30) {
+                    ctx.fillStyle = '#333';
+                    ctx.font = 'bold 6px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('40MHz', cx, cy);
+                }
+                break;
+            }
+            case 'connector': {
+                ctx.fillStyle = '#222';
+                ctx.fillRect(x, y + h * 0.35, w, h * 0.6);
+                ctx.strokeStyle = '#555'; ctx.lineWidth = 0.5;
+                ctx.strokeRect(x, y + h * 0.35, w, h * 0.6);
+                // Inner slot
+                ctx.fillStyle = '#0a0a0a';
+                ctx.fillRect(x + 4, y + h * 0.5, w - 8, h * 0.35);
+                if (w > 40) {
+                    ctx.fillStyle = '#666';
+                    ctx.font = 'bold 6px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('USB-C', cx, y + h * 0.8);
+                }
+                break;
+            }
+            default: {
+                ctx.fillStyle = SMD_COLORS[smd.type] || '#444';
+                ctx.fillRect(x, y, w, h);
+            }
+        }
+
+        // Solder joints (silver fillets at each terminal) after reflow
+        if (reflowed) {
+            ctx.fillStyle = 'rgba(200,200,210,0.9)';
+            const joints = jointPositionsFor(smd.type, x, y, w, h);
+            joints.forEach(j => {
+                ctx.beginPath();
+                ctx.ellipse(j.x, j.y, j.rx, j.ry, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        ctx.restore();
+    }
+
+    function jointPositionsFor(type, x, y, w, h) {
+        const left = x + Math.max(2, w * 0.1);
+        const right = x + w - Math.max(2, w * 0.1);
+        const midY = y + h / 2;
+        if (type === 'ic' || type === 'qfp' || type === 'connector') {
+            // Multiple joints along edges
+            const out = [];
+            const n = 4;
+            for (let i = 0; i < n; i++) {
+                const t = (i + 0.5) / n;
+                out.push({ x: x + 2, y: y + h * t, rx: 2, ry: 1.5 });
+                out.push({ x: x + w - 2, y: y + h * t, rx: 2, ry: 1.5 });
+            }
+            return out;
+        }
+        return [
+            { x: left, y: midY, rx: 2.5, ry: Math.min(2, h / 3) },
+            { x: right, y: midY, rx: 2.5, ry: Math.min(2, h / 3) },
+        ];
+    }
+
+    // Draw a realistic mini icon of an SMD component for the palette
+    function drawSmtMiniIcon(mc, type) {
+        const g = mc.getContext('2d');
+        const W = mc.width, H = mc.height;
+        g.clearRect(0, 0, W, H);
+        const cx = W / 2, cy = H / 2;
+        g.save();
+        switch (type) {
+            case 'resistor': {
+                // SMD 0805 chip resistor: dark body with silver end caps + "103" marking
+                const bw = 28, bh = 14;
+                const bx = cx - bw / 2, by = cy - bh / 2;
+                g.fillStyle = '#c0c0c0';
+                g.fillRect(bx - 3, by, 4, bh);
+                g.fillRect(bx + bw - 1, by, 4, bh);
+                const grad = g.createLinearGradient(0, by, 0, by + bh);
+                grad.addColorStop(0, '#2a2a2a'); grad.addColorStop(0.5, '#111'); grad.addColorStop(1, '#2a2a2a');
+                g.fillStyle = grad; g.fillRect(bx, by, bw, bh);
+                g.fillStyle = '#fff'; g.font = 'bold 8px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+                g.fillText('103', cx, cy);
+                break;
+            }
+            case 'capacitor': {
+                // MLCC chip cap — tan ceramic body, no marking
+                const bw = 24, bh = 14;
+                const bx = cx - bw / 2, by = cy - bh / 2;
+                g.fillStyle = '#c0c0c0';
+                g.fillRect(bx - 3, by, 4, bh);
+                g.fillRect(bx + bw - 1, by, 4, bh);
+                const grad = g.createLinearGradient(0, by, 0, by + bh);
+                grad.addColorStop(0, '#d4a373'); grad.addColorStop(0.5, '#8b5a2b'); grad.addColorStop(1, '#d4a373');
+                g.fillStyle = grad; g.fillRect(bx, by, bw, bh);
+                break;
+            }
+            case 'led': {
+                // SMD LED — clear lens on white body with red glow
+                const bw = 22, bh = 16;
+                const bx = cx - bw / 2, by = cy - bh / 2;
+                g.fillStyle = '#f0f0f0'; g.fillRect(bx, by, bw, bh);
+                g.strokeStyle = '#888'; g.lineWidth = 0.5; g.strokeRect(bx, by, bw, bh);
+                const lensGrad = g.createRadialGradient(cx, cy, 1, cx, cy, 8);
+                lensGrad.addColorStop(0, '#ff8a8a'); lensGrad.addColorStop(0.6, '#ff3030'); lensGrad.addColorStop(1, '#660000');
+                g.fillStyle = lensGrad;
+                g.beginPath(); g.arc(cx, cy, 6, 0, Math.PI * 2); g.fill();
+                // Cathode mark (green triangle)
+                g.fillStyle = '#00e676';
+                g.beginPath(); g.moveTo(bx + 2, by + 2); g.lineTo(bx + 6, by + 2); g.lineTo(bx + 2, by + 6); g.closePath(); g.fill();
+                break;
+            }
+            case 'ic':
+            case 'qfp': {
+                // Square SOIC/QFP — black body with pins + pin-1 dot
+                const s = 22;
+                const bx = cx - s / 2, by = cy - s / 2;
+                // Pins on 4 sides
+                g.fillStyle = '#c0c0c0';
+                for (let i = 0; i < 4; i++) {
+                    const off = -8 + i * 5;
+                    g.fillRect(bx - 3, by + s / 2 + off, 3, 2);
+                    g.fillRect(bx + s, by + s / 2 + off, 3, 2);
+                    g.fillRect(bx + s / 2 + off, by - 3, 2, 3);
+                    g.fillRect(bx + s / 2 + off, by + s, 2, 3);
+                }
+                const grad = g.createLinearGradient(bx, by, bx + s, by + s);
+                grad.addColorStop(0, '#3a3a3a'); grad.addColorStop(1, '#0a0a0a');
+                g.fillStyle = grad; g.fillRect(bx, by, s, s);
+                g.strokeStyle = '#555'; g.lineWidth = 0.5; g.strokeRect(bx, by, s, s);
+                // Pin-1 dot
+                g.fillStyle = '#ccc'; g.beginPath(); g.arc(bx + 4, by + 4, 1.3, 0, Math.PI * 2); g.fill();
+                break;
+            }
+            case 'diode': {
+                // SOD-123 diode — black body with white cathode stripe
+                const bw = 26, bh = 12;
+                const bx = cx - bw / 2, by = cy - bh / 2;
+                g.fillStyle = '#c0c0c0';
+                g.fillRect(bx - 3, by + 2, 4, bh - 4);
+                g.fillRect(bx + bw - 1, by + 2, 4, bh - 4);
+                g.fillStyle = '#151515'; g.fillRect(bx, by, bw, bh);
+                g.fillStyle = '#f0f0f0'; g.fillRect(bx + bw - 6, by, 2, bh);
+                break;
+            }
+            case 'crystal': {
+                // HC-49 crystal can — silver oval
+                const bw = 28, bh = 16;
+                const bx = cx - bw / 2, by = cy - bh / 2;
+                const grad = g.createLinearGradient(0, by, 0, by + bh);
+                grad.addColorStop(0, '#e0e0e0'); grad.addColorStop(0.5, '#a0a0a0'); grad.addColorStop(1, '#606060');
+                g.fillStyle = grad;
+                roundRect(g, bx, by, bw, bh, 7); g.fill();
+                g.strokeStyle = '#333'; g.lineWidth = 0.5; g.stroke();
+                g.fillStyle = '#333'; g.font = 'bold 6px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+                g.fillText('16MHz', cx, cy);
+                break;
+            }
+            case 'connector': {
+                // Pin header — gold pins on dark base
+                g.fillStyle = '#222'; g.fillRect(cx - 14, cy - 3, 28, 6);
+                g.fillStyle = '#ffcc33';
+                for (let i = 0; i < 5; i++) {
+                    g.fillRect(cx - 12 + i * 6, cy - 10, 3, 7);
+                    g.fillRect(cx - 12 + i * 6, cy + 3, 3, 7);
+                }
+                break;
+            }
+            case 'solderpaste': {
+                // Syringe dropping paste blobs
+                g.fillStyle = '#c0c0c0';
+                g.fillRect(cx - 3, cy - 14, 6, 14);
+                g.fillStyle = '#888';
+                g.fillRect(cx - 1.5, cy, 3, 4);
+                // Paste blobs
+                g.fillStyle = '#9e9e9e';
+                g.beginPath(); g.arc(cx - 7, cy + 10, 3, 0, Math.PI * 2); g.fill();
+                g.beginPath(); g.arc(cx, cy + 12, 3.5, 0, Math.PI * 2); g.fill();
+                g.beginPath(); g.arc(cx + 7, cy + 10, 3, 0, Math.PI * 2); g.fill();
+                g.strokeStyle = '#666'; g.lineWidth = 0.5;
+                g.beginPath(); g.arc(cx, cy + 12, 3.5, 0, Math.PI * 2); g.stroke();
+                break;
+            }
+            default: {
+                g.fillStyle = SMD_COLORS[type] || '#888';
+                g.fillRect(cx - 10, cy - 6, 20, 12);
+            }
+        }
+        g.restore();
     }
 
     function getTutorialAPI() {

@@ -10,16 +10,17 @@ const pcbGame = (() => {
     let currentChallenge = 0;
     let score = 0;
     let powered = false;
+    let circuitComplete = false;
 
     const COMPONENT_TYPES = {
-        resistor: { name: 'Resistor', w: 3, h: 1, color: '#e8a87c', pins: [{dx:0,dy:0},{dx:2,dy:0}], symbol: 'R', detail: '10k\u03a9' },
-        capacitor: { name: 'Capacitor', w: 2, h: 2, color: '#41b3a3', pins: [{dx:0,dy:0},{dx:1,dy:1}], symbol: 'C', detail: '100\u00b5F' },
-        led: { name: 'LED', w: 2, h: 2, color: '#ff5252', pins: [{dx:0,dy:1},{dx:1,dy:1}], symbol: 'LED', detail: 'Red 3mm' },
-        ic: { name: 'IC Chip', w: 4, h: 3, color: '#303030', pins: [{dx:0,dy:0},{dx:0,dy:2},{dx:3,dy:0},{dx:3,dy:2}], symbol: 'IC', detail: 'NE555' },
-        transistor: { name: 'Transistor', w: 2, h: 2, color: '#7c4dff', pins: [{dx:0,dy:1},{dx:1,dy:0},{dx:1,dy:1}], symbol: 'Q', detail: '2N2222' },
-        battery: { name: 'Battery', w: 2, h: 3, color: '#ff9100', pins: [{dx:0,dy:0},{dx:0,dy:2}], symbol: 'BAT', detail: '9V' },
-        switch: { name: 'Switch', w: 2, h: 1, color: '#00e5ff', pins: [{dx:0,dy:0},{dx:1,dy:0}], symbol: 'SW', detail: 'SPST' },
-        potentiometer: { name: 'Potentiometer', w: 2, h: 2, color: '#69f0ae', pins: [{dx:0,dy:0},{dx:1,dy:0},{dx:0,dy:1}], symbol: 'POT', detail: '10k\u03a9' },
+        resistor: { name: 'Resistor', w: 3, h: 1, color: '#e8a87c', pins: [{dx:0,dy:0},{dx:2,dy:0}], symbol: 'R', detail: '10k\u03a9', role: 'Limits current flow — protects LEDs and other parts from burning out. Measured in Ohms (\u03a9).' },
+        capacitor: { name: 'Capacitor', w: 2, h: 2, color: '#41b3a3', pins: [{dx:0,dy:0},{dx:1,dy:1}], symbol: 'C', detail: '100\u00b5F', role: 'Stores energy and smooths voltage. Used for filtering, decoupling, and timing circuits.' },
+        led: { name: 'LED', w: 2, h: 2, color: '#ff5252', pins: [{dx:0,dy:1},{dx:1,dy:1}], symbol: 'LED', detail: 'Red 3mm', role: 'Light Emitting Diode. Only conducts one way — longer leg is anode (+), shorter is cathode (-).' },
+        ic: { name: 'IC Chip', w: 4, h: 3, color: '#303030', pins: [{dx:0,dy:0},{dx:0,dy:2},{dx:3,dy:0},{dx:3,dy:2}], symbol: 'IC', detail: 'NE555', role: 'Integrated Circuit — contains thousands of components in one package. NE555 is a classic timer IC.' },
+        transistor: { name: 'Transistor', w: 2, h: 2, color: '#7c4dff', pins: [{dx:0,dy:1},{dx:1,dy:0},{dx:1,dy:1}], symbol: 'Q', detail: '2N2222', role: 'Electronic switch/amplifier. Small current on base controls large current between collector and emitter.' },
+        battery: { name: 'Battery', w: 2, h: 3, color: '#ff9100', pins: [{dx:0,dy:0},{dx:0,dy:2}], symbol: 'BAT', detail: '9V', role: 'Power source. Provides the voltage that drives current through your circuit.' },
+        switch: { name: 'Switch', w: 2, h: 1, color: '#00e5ff', pins: [{dx:0,dy:0},{dx:1,dy:0}], symbol: 'SW', detail: 'SPST', role: 'Opens or closes the circuit. Controls when current can flow.' },
+        potentiometer: { name: 'Potentiometer', w: 2, h: 2, color: '#69f0ae', pins: [{dx:0,dy:0},{dx:1,dy:0},{dx:0,dy:1}], symbol: 'POT', detail: '10k\u03a9', role: 'Variable resistor — turn the knob to adjust resistance. Used for volume, brightness, sensor inputs.' },
     };
 
     const challenges = [
@@ -93,6 +94,9 @@ const pcbGame = (() => {
         traces = [];
         score = 0;
         powered = false;
+        circuitComplete = false;
+        const pBtn = document.querySelector('button[onclick="pcbGame.powerOn()"]');
+        if (pBtn) pBtn.classList.remove('btn-pulse');
         document.getElementById('pcb-score').textContent = '0';
 
         // Build palette
@@ -109,15 +113,27 @@ const pcbGame = (() => {
             const item = document.createElement('div');
             item.className = 'palette-item';
             item.dataset.type = type;
+            const iconId = `pcb-icon-${type}`;
             item.innerHTML = `
-                <div class="comp-icon" style="background:${comp.color}22;color:${comp.color}">${comp.symbol}</div>
+                <div class="comp-icon" style="background:${comp.color}1a;padding:0;overflow:hidden;border-radius:6px;display:flex;align-items:center;justify-content:center;">
+                    <canvas id="${iconId}" width="40" height="32" style="display:block;width:40px;height:32px;max-width:none;max-height:none;"></canvas>
+                </div>
                 <div class="comp-info">
                     <div class="comp-name">${comp.name}${count > 0 ? ' <span style="color:var(--accent-green)">x' + count + '</span>' : ''}</div>
                     <div class="comp-detail">${comp.detail}</div>
                 </div>
             `;
             item.onclick = () => selectComponent(type, item);
+            // Hover tooltip with component role/description
+            item.addEventListener('mouseenter', (e) => showPaletteTip(comp, e.clientX, e.clientY));
+            item.addEventListener('mousemove', (e) => showPaletteTip(comp, e.clientX, e.clientY));
+            item.addEventListener('mouseleave', hidePaletteTip);
             palette.appendChild(item);
+            // Render realistic mini-icon for this component
+            setTimeout(() => {
+                const mc = document.getElementById(iconId);
+                if (mc) drawPaletteMiniIcon(mc, type);
+            }, 0);
         });
 
         // Build checklist
@@ -195,6 +211,37 @@ const pcbGame = (() => {
         const tIdx = findTraceAt(px, py);
         if (tIdx >= 0) { traces.splice(tIdx, 1); updateChecklist(); draw(); return true; }
         return false;
+    }
+
+    // ─── Palette hover tooltip ───────────────────────────────────────────────
+    function ensurePaletteTip() {
+        let tip = document.getElementById('pcb-palette-tip');
+        if (tip) return tip;
+        tip = document.createElement('div');
+        tip.id = 'pcb-palette-tip';
+        tip.className = 'pcb-palette-tip';
+        document.body.appendChild(tip);
+        return tip;
+    }
+    function showPaletteTip(comp, x, y) {
+        const tip = ensurePaletteTip();
+        tip.innerHTML = `
+            <div class="tip-head"><span class="tip-name">${comp.name}</span><span class="tip-detail">${comp.detail}</span></div>
+            <div class="tip-role">${comp.role || ''}</div>
+        `;
+        tip.style.left = (x + 16) + 'px';
+        tip.style.top = (y + 16) + 'px';
+        tip.classList.add('visible');
+        // Keep on-screen
+        requestAnimationFrame(() => {
+            const r = tip.getBoundingClientRect();
+            if (r.right > window.innerWidth - 8) tip.style.left = (x - r.width - 16) + 'px';
+            if (r.bottom > window.innerHeight - 8) tip.style.top = (y - r.height - 16) + 'px';
+        });
+    }
+    function hidePaletteTip() {
+        const tip = document.getElementById('pcb-palette-tip');
+        if (tip) tip.classList.remove('visible');
     }
 
     function setupEvents() {
@@ -312,6 +359,50 @@ const pcbGame = (() => {
         return closest;
     }
 
+    // Parse "type:pinIndex" spec and check if a pin matches it
+    function pinMatchesSpec(pin, spec) {
+        if (!pin || !spec) return false;
+        const parts = spec.split(':');
+        const type = parts[0];
+        const pinIdx = parseInt(parts[1], 10);
+        return pin.compType === type && pin.pinIdx === pinIdx;
+    }
+
+    // Is a required connection [specA, specB] actually made by any trace?
+    function isConnectionMade(conn) {
+        return traces.some(t =>
+            (pinMatchesSpec(t.startPin, conn[0]) && pinMatchesSpec(t.endPin, conn[1])) ||
+            (pinMatchesSpec(t.startPin, conn[1]) && pinMatchesSpec(t.endPin, conn[0]))
+        );
+    }
+
+    // Find the actual pin coordinates for a "type:pinIdx" spec
+    function findPinBySpec(spec) {
+        const parts = spec.split(':');
+        const type = parts[0];
+        const pinIdx = parseInt(parts[1], 10);
+        for (const comp of placedComponents) {
+            if (comp.type === type && comp.pins[pinIdx]) {
+                return { x: comp.pins[pinIdx].x, y: comp.pins[pinIdx].y, comp };
+            }
+        }
+        return null;
+    }
+
+    // Find the first required connection that hasn't been made yet,
+    // where both endpoints have placed components — used for hint highlighting.
+    function getNextHintConnection() {
+        const ch = challenges[currentChallenge];
+        if (!ch || !ch.connections) return null;
+        for (const conn of ch.connections) {
+            if (isConnectionMade(conn)) continue;
+            const a = findPinBySpec(conn[0]);
+            const b = findPinBySpec(conn[1]);
+            if (a && b) return { a, b, conn };
+        }
+        return null;
+    }
+
     function updateChecklist() {
         const ch = challenges[currentChallenge];
         const compTypes = placedComponents.map(c => c.type);
@@ -339,11 +430,13 @@ const pcbGame = (() => {
             }
         }
 
-        // Connection checks (remaining items after reqCount)
+        // Connection checks — validate each SPECIFIC required connection is actually made
+        // (matching the correct component type + pin index on both ends)
         for (let i = reqCount; i < ch.checklist.length; i++) {
             const el = document.getElementById(`pcb-check-${i}`);
             if (!el) continue;
-            if (traces.length > i - reqCount) {
+            const conn = ch.connections[i - reqCount];
+            if (conn && isConnectionMade(conn)) {
                 el.classList.add('done');
                 el.querySelector('.check-mark').textContent = '\u2713';
                 done++;
@@ -353,8 +446,29 @@ const pcbGame = (() => {
             }
         }
 
+        const prevScore = score;
         score = done * 50;
-        document.getElementById('pcb-score').textContent = score;
+        const scoreEl = document.getElementById('pcb-score');
+        scoreEl.textContent = score;
+        if (score !== prevScore) {
+            scoreEl.classList.remove('score-bump');
+            // Force reflow so animation re-triggers
+            void scoreEl.offsetWidth;
+            scoreEl.classList.add('score-bump');
+        }
+
+        // Detect completion — all checklist items done
+        const nowComplete = (done === ch.checklist.length) && ch.checklist.length > 0;
+        const pBtn = document.querySelector('button[onclick="pcbGame.powerOn()"]');
+        if (nowComplete && !circuitComplete) {
+            circuitComplete = true;
+            if (pBtn) pBtn.classList.add('btn-pulse');
+            draw();
+        } else if (!nowComplete && circuitComplete) {
+            circuitComplete = false;
+            if (pBtn) pBtn.classList.remove('btn-pulse');
+            draw();
+        }
     }
 
     function powerOn() {
@@ -372,10 +486,14 @@ const pcbGame = (() => {
             }
         }
 
-        const connectionScore = Math.min(traces.length / ch.connections.length, 1);
+        // Count how many of the specific required connections are actually made
+        const correctConns = ch.connections.filter(isConnectionMade).length;
+        const connectionScore = correctConns / ch.connections.length;
         const totalScore = allPlaced ? Math.round((0.5 + connectionScore * 0.5) * 1000) : Math.round(connectionScore * 300);
 
         powered = true;
+        const pBtn = document.querySelector('button[onclick="pcbGame.powerOn()"]');
+        if (pBtn) pBtn.classList.remove('btn-pulse');
         draw();
         addGamePlayed();
 
@@ -391,7 +509,7 @@ const pcbGame = (() => {
         showModal(
             success ? 'Circuit Working!' : 'Circuit Needs Work',
             `<div class="result-row"><span class="result-label">Components Placed</span><span class="result-value ${allPlaced ? 'good' : 'bad'}">${allPlaced ? 'All Required' : 'Missing Some'}</span></div>
-             <div class="result-row"><span class="result-label">Connections</span><span class="result-value">${traces.length}/${ch.connections.length}</span></div>
+             <div class="result-row"><span class="result-label">Correct Connections</span><span class="result-value ${correctConns === ch.connections.length ? 'good' : 'bad'}">${correctConns}/${ch.connections.length}</span></div>
              <div class="result-row"><span class="result-label">Score</span><span class="result-value good">${totalScore}</span></div>
              <div class="xp-earned">+${xp} XP</div>`,
             success
@@ -528,6 +646,195 @@ const pcbGame = (() => {
                 }
             }
         }
+
+        // Hint: highlight the next unmet connection so the user knows what to wire
+        // Only shown when components are placed and circuit isn't already complete.
+        if (!circuitComplete && !powered && placedComponents.length > 0) {
+            const hint = getNextHintConnection();
+            if (hint) {
+                const t = Date.now() / 400;
+                const pulse = 0.5 + 0.35 * Math.sin(t);
+                ctx.save();
+                // Dashed guide line between the two pins
+                ctx.strokeStyle = 'rgba(255, 214, 0, ' + (0.55 + 0.3 * Math.sin(t)) + ')';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 6]);
+                ctx.lineDashOffset = -((Date.now() / 40) % 28);
+                ctx.beginPath();
+                ctx.moveTo(hint.a.x, hint.a.y);
+                ctx.lineTo(hint.b.x, hint.b.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.lineDashOffset = 0;
+                // Pulsing rings around each endpoint
+                [hint.a, hint.b].forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 10 + 4 * pulse, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 214, 0, ' + (0.9 - 0.4 * pulse) + ')';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 16 + 8 * pulse, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 214, 0, ' + (0.35 - 0.25 * pulse) + ')';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                });
+                // Label — positioned in empty space so it never overlaps any component
+                const label = 'HINT: connect ' + hint.conn[0] + ' \u2194 ' + hint.conn[1];
+                ctx.font = 'bold 11px Inter, sans-serif';
+                const tw = ctx.measureText(label).width;
+                const lw = tw + 12, lh = 18;
+                // Candidate positions: above topmost component, below bottommost, left, right
+                const pad = 10;
+                const topY = Math.min(...placedComponents.map(c => c.y)) - lh - pad;
+                const botY = Math.max(...placedComponents.map(c => c.y + c.h)) + pad;
+                const midX = (hint.a.x + hint.b.x) / 2 - lw / 2;
+                const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+                const candidates = [
+                    { x: clamp(midX, 6, w - lw - 6), y: topY },
+                    { x: clamp(midX, 6, w - lw - 6), y: botY },
+                    { x: clamp(midX, 6, w - lw - 6), y: 6 },
+                    { x: clamp(midX, 6, w - lw - 6), y: h - lh - 6 },
+                ];
+                function overlapsAny(bx, by) {
+                    if (bx < 0 || by < 0 || bx + lw > w || by + lh > h) return true;
+                    return placedComponents.some(c =>
+                        bx < c.x + c.w + 4 && bx + lw > c.x - 4 &&
+                        by < c.y + c.h + 4 && by + lh > c.y - 4
+                    );
+                }
+                let pick = candidates.find(p => !overlapsAny(p.x, p.y)) || candidates[0];
+                // Leader line from pick to midpoint of the guide segment
+                const midLineX = (hint.a.x + hint.b.x) / 2;
+                const midLineY = (hint.a.y + hint.b.y) / 2;
+                ctx.strokeStyle = 'rgba(255, 214, 0, 0.45)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(pick.x + lw / 2, pick.y + lh / 2);
+                ctx.lineTo(midLineX, midLineY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // Label box
+                ctx.fillStyle = 'rgba(20, 20, 10, 0.92)';
+                roundRect(ctx, pick.x, pick.y, lw, lh, 4);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 214, 0, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.fillStyle = '#ffd600';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, pick.x + lw / 2, pick.y + lh / 2);
+                ctx.restore();
+                // Keep animating
+                if (!draw._hintAnim) {
+                    draw._hintAnim = true;
+                    requestAnimationFrame(() => {
+                        draw._hintAnim = false;
+                        if (!circuitComplete && !powered && getNextHintConnection()) draw();
+                    });
+                }
+            }
+        }
+
+        // Circuit complete banner — shown when all checklist items done, before powering on
+        if (circuitComplete && !powered) {
+            const bw = 440, bh = 72;
+            const bx = (w - bw) / 2, by = 18;
+            const pulse = 0.55 + 0.25 * Math.sin(Date.now() / 300);
+            ctx.save();
+            // Glow
+            ctx.shadowColor = 'rgba(62,207,113,' + pulse + ')';
+            ctx.shadowBlur = 24;
+            ctx.fillStyle = 'rgba(12, 38, 22, 0.92)';
+            roundRect(ctx, bx, by, bw, bh, 12);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(62,207,113,' + pulse + ')';
+            ctx.lineWidth = 2.5;
+            roundRect(ctx, bx, by, bw, bh, 12);
+            ctx.stroke();
+            // Check icon
+            ctx.beginPath();
+            ctx.arc(bx + 30, by + bh / 2, 16, 0, Math.PI * 2);
+            ctx.fillStyle = '#3ecf71';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(bx + 22, by + bh / 2 + 1);
+            ctx.lineTo(bx + 28, by + bh / 2 + 7);
+            ctx.lineTo(bx + 38, by + bh / 2 - 5);
+            ctx.stroke();
+            // Text
+            ctx.fillStyle = '#3ecf71';
+            ctx.font = 'bold 17px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Circuit Complete!', bx + 56, by + 24);
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.font = '12px Inter, sans-serif';
+            ctx.fillText('Click "Power On & Test" to verify your design', bx + 56, by + 48);
+            ctx.restore();
+            // Keep animating while waiting for power on
+            if (!draw._animating) {
+                draw._animating = true;
+                requestAnimationFrame(() => { draw._animating = false; if (circuitComplete && !powered) draw(); });
+            }
+        }
+
+        // Powered-on success overlay
+        if (powered) {
+            ctx.save();
+            const bw = 360, bh = 54;
+            const bx = (w - bw) / 2, by = 18;
+            ctx.fillStyle = 'rgba(20, 50, 30, 0.92)';
+            ctx.shadowColor = 'rgba(255,145,0,0.6)';
+            ctx.shadowBlur = 20;
+            roundRect(ctx, bx, by, bw, bh, 10);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = '#ff9100';
+            ctx.lineWidth = 2;
+            roundRect(ctx, bx, by, bw, bh, 10);
+            ctx.stroke();
+            ctx.fillStyle = '#ff9100';
+            ctx.font = 'bold 16px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚡ CIRCUIT POWERED — CURRENT FLOWING ⚡', bx + bw / 2, by + bh / 2);
+            ctx.restore();
+        }
+    }
+
+    // Draw a realistic, scaled-to-fit mini icon of a component for the palette
+    function drawPaletteMiniIcon(miniCanvas, type) {
+        const mctx = miniCanvas.getContext('2d');
+        const CW = miniCanvas.width, CH = miniCanvas.height;
+        mctx.clearRect(0, 0, CW, CH);
+        const ct = COMPONENT_TYPES[type];
+        if (!ct) return;
+        const baseW = ct.w * GRID, baseH = ct.h * GRID;
+        const pad = 5;
+        const scale = Math.min((CW - pad * 2) / baseW, (CH - pad * 2) / baseH);
+        const dw = baseW * scale, dh = baseH * scale;
+        const dx = (CW - dw) / 2, dy = (CH - dh) / 2;
+        mctx.save();
+        mctx.translate(dx, dy);
+        mctx.scale(scale, scale);
+        switch (type) {
+            case 'resistor': drawResistor(mctx, 0, 0, baseW, baseH, false); break;
+            case 'capacitor': drawCapacitor(mctx, 0, 0, baseW, baseH, false); break;
+            case 'led': drawLED(mctx, 0, 0, baseW, baseH, false); break;
+            case 'ic': drawIC(mctx, 0, 0, baseW, baseH, false); break;
+            case 'transistor': drawTransistor(mctx, 0, 0, baseW, baseH, false); break;
+            case 'battery': drawBatteryComp(mctx, 0, 0, baseW, baseH, false); break;
+            case 'switch': drawSwitch(mctx, 0, 0, baseW, baseH, false); break;
+            case 'potentiometer': drawPot(mctx, 0, 0, baseW, baseH, false); break;
+        }
+        mctx.restore();
     }
 
     // ─── Realistic component drawing ────────────────────────────────────────
