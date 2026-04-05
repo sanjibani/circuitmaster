@@ -247,8 +247,8 @@ body {
 }
 
 .palette-item .comp-icon {
-    width: 44px;
-    height: 36px;
+    width: 56px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -257,8 +257,11 @@ body {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 700;
     flex-shrink: 0;
+    background: linear-gradient(135deg, #141a26, #0b0f17);
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
 }
-.palette-item .comp-icon canvas { display: block; }
+.palette-item .comp-icon canvas { display: block; width: 56px; height: 56px; }
 
 /* ============ PCB PALETTE HOVER TOOLTIP ============ */
 .pcb-palette-tip {

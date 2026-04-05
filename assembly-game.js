@@ -269,8 +269,8 @@ const assemblyGame = (() => {
             // Mini canvas icon for each part
             const iconId = `part-icon-${part.id}`;
             item.innerHTML = `
-                <div class="comp-icon" style="padding:0;overflow:hidden;border-radius:6px;display:flex;align-items:center;justify-content:center;">
-                    <canvas id="${iconId}" width="40" height="32" style="display:block;width:40px;height:32px;max-width:none;max-height:none;"></canvas>
+                <div class="comp-icon">
+                    <canvas id="${iconId}" width="56" height="56"></canvas>
                 </div>
                 <div class="comp-info">
                     <div class="comp-name">${part.name}</div>
@@ -308,19 +308,358 @@ const assemblyGame = (() => {
     }
 
     function drawMiniIcon(miniCanvas, part) {
-        const mctx = miniCanvas.getContext('2d');
-        const w = miniCanvas.width, h = miniCanvas.height;
-        mctx.fillStyle = '#1a1f2e';
-        mctx.fillRect(0, 0, w, h);
-        // Scale and center the part
-        const scale = Math.min(w / part.w, h / part.h) * 0.75;
-        const offX = (w - part.w * scale) / 2;
-        const offY = (h - part.h * scale) / 2;
-        mctx.save();
-        mctx.translate(offX, offY);
-        mctx.scale(scale, scale);
-        drawPart(mctx, part, 0, 0, 1, true);
-        mctx.restore();
+        const c = miniCanvas.getContext('2d');
+        const W = miniCanvas.width, H = miniCanvas.height;
+        c.clearRect(0, 0, W, H);
+        // Dark panel background
+        const bg = c.createLinearGradient(0, 0, 0, H);
+        bg.addColorStop(0, '#151b27');
+        bg.addColorStop(1, '#0a0e16');
+        c.fillStyle = bg;
+        c.fillRect(0, 0, W, H);
+
+        const cx = W / 2, cy = H / 2;
+        const shape = part.shape;
+        const color = part.color || '#8892a6';
+
+        c.save();
+        switch (shape) {
+            case 'frame':
+            case 'rugged-frame': {
+                // Phone outline
+                const pw = 26, ph = 44;
+                const x = cx - pw / 2, y = cy - ph / 2;
+                const g = c.createLinearGradient(x, y, x + pw, y + ph);
+                g.addColorStop(0, lighten(color, 40));
+                g.addColorStop(0.5, color);
+                g.addColorStop(1, darken(color, 30));
+                c.fillStyle = g;
+                roundRectMini(c, x, y, pw, ph, 5); c.fill();
+                c.strokeStyle = lighten(color, 50); c.lineWidth = 1; c.stroke();
+                // Inner screen area
+                c.fillStyle = '#0a0e16';
+                roundRectMini(c, x + 3, y + 5, pw - 6, ph - 10, 2); c.fill();
+                // Speaker notch
+                c.fillStyle = '#000';
+                c.fillRect(cx - 4, y + 3, 8, 1.5);
+                // Side button
+                c.fillStyle = lighten(color, 20);
+                c.fillRect(x + pw, y + 10, 1.5, 6);
+                if (shape === 'rugged-frame') {
+                    c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 0.6;
+                    for (let i = 0; i < 4; i++) {
+                        c.beginPath(); c.moveTo(x - 1, y + 8 + i * 8); c.lineTo(x + pw + 1, y + 8 + i * 8); c.stroke();
+                    }
+                }
+                break;
+            }
+            case 'innershield': {
+                const x = 8, y = 10, w = W - 16, h = H - 20;
+                const g = c.createLinearGradient(x, y, x, y + h);
+                g.addColorStop(0, '#8b95a8'); g.addColorStop(1, '#424a5c');
+                c.fillStyle = g;
+                roundRectMini(c, x, y, w, h, 3); c.fill();
+                c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 0.5;
+                for (let i = x + 4; i < x + w; i += 5) { c.beginPath(); c.moveTo(i, y); c.lineTo(i, y + h); c.stroke(); }
+                for (let j = y + 4; j < y + h; j += 5) { c.beginPath(); c.moveTo(x, j); c.lineTo(x + w, j); c.stroke(); }
+                c.strokeStyle = '#aab4c4'; c.lineWidth = 1;
+                roundRectMini(c, x, y, w, h, 3); c.stroke();
+                break;
+            }
+            case 'pcb': {
+                const x = 6, y = 10, w = W - 12, h = H - 20;
+                const g = c.createLinearGradient(x, y, x + w, y + h);
+                g.addColorStop(0, '#1e5a2a'); g.addColorStop(1, '#0f3518');
+                c.fillStyle = g;
+                roundRectMini(c, x, y, w, h, 2); c.fill();
+                // Traces
+                c.strokeStyle = 'rgba(220,180,40,0.75)'; c.lineWidth = 0.8;
+                c.beginPath(); c.moveTo(x + 4, y + 8); c.lineTo(x + 18, y + 8); c.lineTo(x + 18, y + 22); c.stroke();
+                c.beginPath(); c.moveTo(x + 30, y + 6); c.lineTo(x + 30, y + 28); c.stroke();
+                c.beginPath(); c.moveTo(x + 6, y + h - 6); c.lineTo(x + w - 6, y + h - 6); c.stroke();
+                // IC chip
+                c.fillStyle = '#0a0a0a';
+                c.fillRect(cx - 7, cy - 5, 14, 10);
+                c.strokeStyle = '#3ecf71'; c.lineWidth = 0.6;
+                c.strokeRect(cx - 7, cy - 5, 14, 10);
+                // Pins
+                c.fillStyle = '#d4a020';
+                for (let i = 0; i < 5; i++) { c.fillRect(cx - 6 + i * 3, cy - 7, 1.5, 2); c.fillRect(cx - 6 + i * 3, cy + 5, 1.5, 2); }
+                break;
+            }
+            case 'battery': {
+                const x = 8, y = 14, w = W - 18, h = H - 28;
+                c.fillStyle = '#1a1f2e';
+                roundRectMini(c, x, y, w, h, 2); c.fill();
+                // Fill level (85%)
+                const fillH = (h - 4) * 0.85;
+                const g = c.createLinearGradient(x, y + h - 2 - fillH, x, y + h - 2);
+                g.addColorStop(0, '#3ecf71'); g.addColorStop(1, '#2a8a4c');
+                c.fillStyle = g;
+                c.fillRect(x + 2, y + h - 2 - fillH, w - 4, fillH);
+                c.strokeStyle = '#d4d4d4'; c.lineWidth = 1.2;
+                roundRectMini(c, x, y, w, h, 2); c.stroke();
+                // Positive terminal nub
+                c.fillStyle = '#d4d4d4';
+                c.fillRect(x + w, y + h / 2 - 3, 3, 6);
+                // Lightning bolt
+                c.fillStyle = '#fff';
+                c.beginPath();
+                c.moveTo(cx - 2, cy - 6); c.lineTo(cx + 3, cy - 1); c.lineTo(cx, cy - 1);
+                c.lineTo(cx + 2, cy + 6); c.lineTo(cx - 3, cy + 1); c.lineTo(cx, cy + 1);
+                c.closePath(); c.fill();
+                break;
+            }
+            case 'camera':
+            case 'periscope': {
+                const r = 18;
+                // Outer housing
+                c.fillStyle = '#1a1f2e';
+                c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = '#4a5668'; c.lineWidth = 1.5;
+                c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke();
+                // Lens glass with rainbow sheen
+                const g = c.createRadialGradient(cx - 3, cy - 3, 2, cx, cy, r - 3);
+                g.addColorStop(0, '#88b4ff');
+                g.addColorStop(0.4, '#2a4e8f');
+                g.addColorStop(0.8, '#0c1528');
+                g.addColorStop(1, '#000');
+                c.fillStyle = g;
+                c.beginPath(); c.arc(cx, cy, r - 3, 0, Math.PI * 2); c.fill();
+                // Aperture blades
+                c.strokeStyle = 'rgba(255,255,255,0.25)'; c.lineWidth = 0.6;
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2;
+                    c.beginPath();
+                    c.moveTo(cx + Math.cos(a) * 4, cy + Math.sin(a) * 4);
+                    c.lineTo(cx + Math.cos(a) * (r - 4), cy + Math.sin(a) * (r - 4));
+                    c.stroke();
+                }
+                // Inner pupil
+                c.fillStyle = '#000';
+                c.beginPath(); c.arc(cx, cy, 4, 0, Math.PI * 2); c.fill();
+                // Highlight
+                c.fillStyle = 'rgba(255,255,255,0.6)';
+                c.beginPath(); c.arc(cx - 4, cy - 5, 2, 0, Math.PI * 2); c.fill();
+                if (shape === 'periscope') {
+                    c.fillStyle = '#ffcc00'; c.font = 'bold 7px sans-serif'; c.textAlign = 'center';
+                    c.fillText('5×', cx, H - 3);
+                }
+                break;
+            }
+            case 'speaker': {
+                // Grille
+                c.fillStyle = '#2a3142';
+                roundRectMini(c, 8, 10, W - 16, H - 20, 4); c.fill();
+                c.strokeStyle = '#4a5668'; c.lineWidth = 1;
+                roundRectMini(c, 8, 10, W - 16, H - 20, 4); c.stroke();
+                // Grille dots
+                c.fillStyle = '#0a0e16';
+                for (let gx = 0; gx < 6; gx++) {
+                    for (let gy = 0; gy < 4; gy++) {
+                        c.beginPath();
+                        c.arc(12 + gx * 6, 14 + gy * 8, 1.3, 0, Math.PI * 2);
+                        c.fill();
+                    }
+                }
+                // Sound waves
+                c.strokeStyle = '#3ecf71'; c.lineWidth = 1.2;
+                c.beginPath(); c.arc(W - 6, cy, 3, -Math.PI / 3, Math.PI / 3); c.stroke();
+                c.beginPath(); c.arc(W - 6, cy, 6, -Math.PI / 3, Math.PI / 3); c.stroke();
+                break;
+            }
+            case 'usbc': {
+                // USB-C connector (oval)
+                const uw = 30, uh = 10;
+                const x = cx - uw / 2, y = cy - uh / 2;
+                c.fillStyle = '#1a1f2e';
+                roundRectMini(c, x, y, uw, uh, 5); c.fill();
+                c.strokeStyle = '#c0c8d4'; c.lineWidth = 1.5;
+                roundRectMini(c, x, y, uw, uh, 5); c.stroke();
+                // Inner tongue
+                c.fillStyle = '#3a4556';
+                roundRectMini(c, x + 3, y + 3, uw - 6, uh - 6, 2); c.fill();
+                // Gold pins
+                c.fillStyle = '#e4b94a';
+                for (let i = 0; i < 6; i++) {
+                    c.fillRect(x + 5 + i * 3.5, y + 4, 1, uh - 8);
+                }
+                c.fillStyle = '#8892a6'; c.font = 'bold 6px sans-serif'; c.textAlign = 'center';
+                c.fillText('USB-C', cx, H - 5);
+                break;
+            }
+            case 'display':
+            case 'dynamic-island': {
+                const pw = 30, ph = 46;
+                const x = cx - pw / 2, y = cy - ph / 2;
+                // Bezel
+                c.fillStyle = '#000';
+                roundRectMini(c, x, y, pw, ph, 4); c.fill();
+                // Screen area
+                const g = c.createLinearGradient(x, y, x, y + ph);
+                g.addColorStop(0, '#2a6edf'); g.addColorStop(0.5, '#1a4fa6'); g.addColorStop(1, '#0c2a5c');
+                c.fillStyle = g;
+                roundRectMini(c, x + 2, y + 3, pw - 4, ph - 6, 2); c.fill();
+                // Dynamic Island pill / notch
+                if (shape === 'dynamic-island') {
+                    c.fillStyle = '#000';
+                    roundRectMini(c, cx - 7, y + 5, 14, 4, 2); c.fill();
+                }
+                // App icons
+                c.fillStyle = 'rgba(255,255,255,0.85)';
+                for (let r = 0; r < 3; r++) {
+                    for (let col = 0; col < 3; col++) {
+                        roundRectMini(c, x + 5 + col * 7, y + 14 + r * 9, 4, 4, 1); c.fill();
+                    }
+                }
+                // Highlight
+                c.fillStyle = 'rgba(255,255,255,0.2)';
+                c.fillRect(x + 3, y + 4, 3, ph - 8);
+                break;
+            }
+            case 'glass': {
+                const pw = 28, ph = 44;
+                const x = cx - pw / 2, y = cy - ph / 2;
+                // Glass sheet
+                const g = c.createLinearGradient(x, y, x + pw, y + ph);
+                g.addColorStop(0, 'rgba(180,220,255,0.9)');
+                g.addColorStop(0.5, 'rgba(120,170,230,0.6)');
+                g.addColorStop(1, 'rgba(60,100,160,0.5)');
+                c.fillStyle = g;
+                roundRectMini(c, x, y, pw, ph, 4); c.fill();
+                c.strokeStyle = '#a0c0e8'; c.lineWidth = 1;
+                roundRectMini(c, x, y, pw, ph, 4); c.stroke();
+                // Diagonal shine
+                c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 2;
+                c.beginPath(); c.moveTo(x + 4, y + ph - 8); c.lineTo(x + pw - 8, y + 4); c.stroke();
+                c.strokeStyle = 'rgba(255,255,255,0.4)'; c.lineWidth = 1;
+                c.beginPath(); c.moveTo(x + 4, y + ph - 14); c.lineTo(x + pw - 14, y + 4); c.stroke();
+                break;
+            }
+            case 'nfc': {
+                // Coil spiral
+                c.strokeStyle = '#c08040'; c.lineWidth = 1.3;
+                for (let i = 0; i < 4; i++) {
+                    c.beginPath();
+                    c.arc(cx, cy, 6 + i * 3, 0, Math.PI * 2);
+                    c.stroke();
+                }
+                // NFC symbol waves
+                c.strokeStyle = '#3ecf71'; c.lineWidth = 1.2;
+                c.beginPath(); c.arc(cx, cy, 20, -Math.PI / 4, Math.PI / 4); c.stroke();
+                c.fillStyle = '#e4b94a'; c.font = 'bold 6px sans-serif'; c.textAlign = 'center';
+                c.fillText('NFC', cx, H - 4);
+                break;
+            }
+            case 'antenna': {
+                // Tower base
+                c.fillStyle = '#4a5668';
+                c.beginPath();
+                c.moveTo(cx - 6, H - 8); c.lineTo(cx + 6, H - 8);
+                c.lineTo(cx + 2, 18); c.lineTo(cx - 2, 18); c.closePath();
+                c.fill();
+                // Top ball
+                c.fillStyle = '#e4b94a';
+                c.beginPath(); c.arc(cx, 14, 3, 0, Math.PI * 2); c.fill();
+                // Signal waves
+                c.strokeStyle = '#3ecf71'; c.lineWidth = 1.3;
+                for (let i = 1; i <= 3; i++) {
+                    c.beginPath();
+                    c.arc(cx, 14, 5 + i * 4, -Math.PI * 0.8, -Math.PI * 0.2);
+                    c.stroke();
+                }
+                break;
+            }
+            case 'taptic': {
+                // Haptic motor cylinder
+                const mw = 28, mh = 16;
+                const x = cx - mw / 2, y = cy - mh / 2;
+                const g = c.createLinearGradient(x, y, x, y + mh);
+                g.addColorStop(0, '#6a7386'); g.addColorStop(0.5, '#3a4556'); g.addColorStop(1, '#1a1f2e');
+                c.fillStyle = g;
+                roundRectMini(c, x, y, mw, mh, 3); c.fill();
+                c.strokeStyle = '#8892a6'; c.lineWidth = 1;
+                roundRectMini(c, x, y, mw, mh, 3); c.stroke();
+                // Ribbing
+                c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 0.5;
+                for (let i = 1; i < 6; i++) { c.beginPath(); c.moveTo(x + i * 5, y); c.lineTo(x + i * 5, y + mh); c.stroke(); }
+                // Vibration lines
+                c.strokeStyle = '#3ecf71'; c.lineWidth = 1.2;
+                c.beginPath(); c.moveTo(x - 4, cy - 3); c.lineTo(x - 2, cy - 3); c.stroke();
+                c.beginPath(); c.moveTo(x - 5, cy); c.lineTo(x - 2, cy); c.stroke();
+                c.beginPath(); c.moveTo(x - 4, cy + 3); c.lineTo(x - 2, cy + 3); c.stroke();
+                c.beginPath(); c.moveTo(x + mw + 2, cy - 3); c.lineTo(x + mw + 4, cy - 3); c.stroke();
+                c.beginPath(); c.moveTo(x + mw + 2, cy); c.lineTo(x + mw + 5, cy); c.stroke();
+                c.beginPath(); c.moveTo(x + mw + 2, cy + 3); c.lineTo(x + mw + 4, cy + 3); c.stroke();
+                break;
+            }
+            case 'spen': {
+                // Stylus at diagonal
+                c.save();
+                c.translate(cx, cy);
+                c.rotate(-Math.PI / 4);
+                // Barrel
+                const g = c.createLinearGradient(-20, -3, -20, 3);
+                g.addColorStop(0, '#3a4556'); g.addColorStop(0.5, '#1a1f2e'); g.addColorStop(1, '#3a4556');
+                c.fillStyle = g;
+                roundRectMini(c, -20, -2.5, 34, 5, 2); c.fill();
+                c.strokeStyle = '#8892a6'; c.lineWidth = 0.5;
+                roundRectMini(c, -20, -2.5, 34, 5, 2); c.stroke();
+                // Tip (cone)
+                c.fillStyle = '#c0c8d4';
+                c.beginPath();
+                c.moveTo(14, -2.5); c.lineTo(22, 0); c.lineTo(14, 2.5); c.closePath();
+                c.fill();
+                // Button
+                c.fillStyle = '#6a7386';
+                c.fillRect(-10, -2.5, 3, 5);
+                c.restore();
+                break;
+            }
+            case 'tempsensor': {
+                // Thermometer
+                c.strokeStyle = '#c0c8d4'; c.lineWidth = 1.5;
+                c.fillStyle = '#0a0e16';
+                c.beginPath();
+                c.arc(cx, H - 14, 5, 0, Math.PI * 2); c.fill(); c.stroke();
+                c.fillRect(cx - 2, 12, 4, H - 26);
+                c.strokeRect(cx - 2, 12, 4, H - 26);
+                // Mercury
+                c.fillStyle = '#ff4d4d';
+                c.beginPath();
+                c.arc(cx, H - 14, 3.5, 0, Math.PI * 2); c.fill();
+                c.fillRect(cx - 1, 20, 2, H - 34);
+                // Scale ticks
+                c.strokeStyle = '#8892a6'; c.lineWidth = 0.5;
+                for (let i = 0; i < 5; i++) {
+                    c.beginPath();
+                    c.moveTo(cx + 3, 16 + i * 6); c.lineTo(cx + 6, 16 + i * 6);
+                    c.stroke();
+                }
+                break;
+            }
+            default: {
+                // Fallback: scaled part drawing
+                const scale = Math.min(W / part.w, H / part.h) * 0.85;
+                const offX = (W - part.w * scale) / 2;
+                const offY = (H - part.h * scale) / 2;
+                c.translate(offX - part.x * scale, offY - part.y * scale);
+                c.scale(scale, scale);
+                drawPart(c, part, 0, 0, 1, true);
+            }
+        }
+        c.restore();
+    }
+
+    function roundRectMini(ctx, x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
     }
 
     function startTimer() {
