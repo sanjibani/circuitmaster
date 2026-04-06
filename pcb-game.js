@@ -323,11 +323,37 @@ const pcbGame = (() => {
             }, 0);
         });
 
-        // Build checklist
+        // Build checklist — each item gets a "locate" button on hover
         const checklist = document.getElementById('pcb-checklist');
         checklist.innerHTML = '<h3>Checklist</h3>';
+        const reqCount = ch.required.length;
         ch.checklist.forEach((text, i) => {
-            checklist.innerHTML += `<div class="check-item" id="pcb-check-${i}"><div class="check-mark"></div><span>${text}</span></div>`;
+            const item = document.createElement('div');
+            item.className = 'check-item';
+            item.id = `pcb-check-${i}`;
+
+            // Locate button — shows the component/pins on canvas
+            const locBtn = document.createElement('button');
+            locBtn.type = 'button';
+            locBtn.className = 'check-locate';
+            locBtn.title = i < reqCount ? 'Show this component' : 'Show these pins on the board';
+            locBtn.innerHTML = '🔍';
+            locBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (i < reqCount) {
+                    // Component item — flash the matching component on board + highlight in palette
+                    const compType = ch.required[i];
+                    highlightComponent(compType);
+                } else {
+                    // Connection item — flash both pins on the canvas
+                    const conn = ch.connections[i - reqCount];
+                    if (conn) highlightConnection(conn);
+                }
+            });
+
+            item.innerHTML = `<div class="check-mark"></div><span>${text}</span>`;
+            item.appendChild(locBtn);
+            checklist.appendChild(item);
         });
 
         // Hints (with optional real-world story + BOM cost line)
@@ -612,6 +638,137 @@ const pcbGame = (() => {
     // Reclassify every trace (called when board state changes)
     function reclassifyAllTraces() {
         traces.forEach(t => { t.status = classifyTrace(t); });
+    }
+
+    // ── Locate helpers — flash components or pins when user clicks 🔍 ────────
+    let _locateHighlight = null;  // { type: 'comp'|'conn', data: ..., startTime }
+
+    function highlightComponent(compType) {
+        // Flash the component on the canvas + pulse the palette item
+        _locateHighlight = { type: 'comp', compType, startTime: Date.now() };
+        // Also pulse the palette item
+        const paletteItem = document.querySelector(`#pcb-components .palette-item[data-type="${compType}"]`);
+        if (paletteItem) {
+            paletteItem.classList.add('locate-pulse');
+            setTimeout(() => paletteItem.classList.remove('locate-pulse'), 1800);
+        }
+        draw();
+    }
+
+    function highlightConnection(conn) {
+        // Flash both pins on the canvas
+        const a = findPinBySpec(conn[0]);
+        const b = findPinBySpec(conn[1]);
+        _locateHighlight = { type: 'conn', conn, a, b, startTime: Date.now() };
+        draw();
+    }
+
+    function drawLocateHighlight() {
+        if (!_locateHighlight) return;
+        const elapsed = Date.now() - _locateHighlight.startTime;
+        if (elapsed > 2000) { _locateHighlight = null; return; }
+        const pulse = 0.5 + 0.5 * Math.sin(elapsed / 120);
+        ctx.save();
+
+        if (_locateHighlight.type === 'comp') {
+            // Flash all placed components of this type
+            const compType = _locateHighlight.compType;
+            placedComponents.forEach(comp => {
+                if (comp.type !== compType) return;
+                ctx.strokeStyle = `rgba(96, 165, 250, ${pulse})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([6, 4]);
+                roundRect(ctx, comp.x - 6, comp.y - 6, comp.w + 12, comp.h + 12, 8);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                // Glow halo
+                ctx.strokeStyle = `rgba(96, 165, 250, ${pulse * 0.3})`;
+                ctx.lineWidth = 10;
+                roundRect(ctx, comp.x - 6, comp.y - 6, comp.w + 12, comp.h + 12, 8);
+                ctx.stroke();
+            });
+            // If component not yet placed, show the component name above the board
+            if (!placedComponents.some(c => c.type === compType)) {
+                const name = COMPONENT_TYPES[compType]?.name || compType;
+                ctx.font = 'bold 13px Inter, sans-serif';
+                const tw = ctx.measureText(name).width;
+                const bx = canvas.width / 2 - tw / 2 - 10;
+                ctx.fillStyle = 'rgba(96, 165, 250, 0.9)';
+                roundRect(ctx, bx, 40, tw + 20, 28, 6);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('⬅ Select ' + name + ' from palette', canvas.width / 2, 54);
+            }
+        } else if (_locateHighlight.type === 'conn') {
+            const { a, b, conn } = _locateHighlight;
+            if (a && b) {
+                // Bright pulsing rings on both pins
+                [a, b].forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 8 + 6 * pulse, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(96, 165, 250, ${pulse})`;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 16 + 10 * pulse, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(96, 165, 250, ${pulse * 0.4})`;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                });
+                // Dashed line between them
+                ctx.strokeStyle = `rgba(96, 165, 250, ${0.6 + 0.4 * pulse})`;
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([8, 5]);
+                ctx.lineDashOffset = -(elapsed / 30);
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.lineDashOffset = 0;
+                // Pin labels
+                [{ p: a, spec: conn[0] }, { p: b, spec: conn[1] }].forEach(({ p, spec }) => {
+                    const lbl = humanPinLabel(spec);
+                    ctx.font = 'bold 10px "JetBrains Mono", monospace';
+                    const tw = ctx.measureText(lbl).width;
+                    ctx.fillStyle = 'rgba(10, 15, 30, 0.9)';
+                    roundRect(ctx, p.x - tw / 2 - 6, p.y - 28, tw + 12, 18, 4);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)';
+                    ctx.lineWidth = 1;
+                    roundRect(ctx, p.x - tw / 2 - 6, p.y - 28, tw + 12, 18, 4);
+                    ctx.stroke();
+                    ctx.fillStyle = '#60a5fa';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(lbl, p.x, p.y - 19);
+                });
+            } else {
+                // One or both components not placed yet
+                const missing = [];
+                if (!a) missing.push(humanPinLabel(conn[0]).split(' (')[0]);
+                if (!b) missing.push(humanPinLabel(conn[1]).split(' (')[0]);
+                const msg = 'Place ' + missing.join(' & ') + ' first';
+                ctx.font = 'bold 12px Inter, sans-serif';
+                const tw = ctx.measureText(msg).width;
+                ctx.fillStyle = 'rgba(248, 113, 113, 0.9)';
+                roundRect(ctx, canvas.width / 2 - tw / 2 - 10, 40, tw + 20, 28, 6);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(msg, canvas.width / 2, 54);
+            }
+        }
+        ctx.restore();
+
+        // Keep animating for the duration
+        if (!draw._locAnim) {
+            draw._locAnim = true;
+            requestAnimationFrame(() => {
+                draw._locAnim = false;
+                if (_locateHighlight) draw();
+            });
+        }
     }
 
     // Check if a specific pin is part of any completed connection
@@ -1128,6 +1285,9 @@ const pcbGame = (() => {
             ctx.fillText('⚡ CIRCUIT POWERED — CURRENT FLOWING ⚡', bx + bw / 2, by + bh / 2);
             ctx.restore();
         }
+
+        // Locate highlight (triggered by 🔍 button on checklist items)
+        drawLocateHighlight();
     }
 
     // Draw a realistic, scaled-to-fit mini icon of a component for the palette
