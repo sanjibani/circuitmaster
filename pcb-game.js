@@ -501,11 +501,13 @@ const pcbGame = (() => {
                     tracePoints = [{ x: pin.x, y: pin.y }];
                 } else {
                     tracePoints.push({ x: pin.x, y: pin.y });
-                    traces.push({
+                    const newTrace = {
                         points: [...tracePoints],
                         startPin: traceStart,
                         endPin: pin
-                    });
+                    };
+                    newTrace.status = classifyTrace(newTrace);
+                    traces.push(newTrace);
                     traceStart = null;
                     tracePoints = [];
                     updateChecklist();
@@ -581,6 +583,65 @@ const pcbGame = (() => {
             }
         }
         return null;
+    }
+
+    // Human-readable pin labels per component type
+    const PIN_LABELS = {
+        battery:       ['V+', 'V−'],
+        resistor:      ['1', '2'],
+        led:           ['A+', 'K−'],
+        capacitor:     ['+', '−'],
+        ic:            ['VCC', 'GND', 'IN', 'OUT'],
+        transistor:    ['C', 'B', 'E'],
+        switch:        ['1', '2'],
+        potentiometer: ['1', '2', 'W'],
+    };
+
+    // Classify a trace as 'correct' (matches a required connection) or 'wrong'
+    function classifyTrace(trace) {
+        const ch = challenges[currentChallenge];
+        if (!ch || !ch.connections) return 'wrong';
+        for (const conn of ch.connections) {
+            const fwd = pinMatchesSpec(trace.startPin, conn[0]) && pinMatchesSpec(trace.endPin, conn[1]);
+            const rev = pinMatchesSpec(trace.startPin, conn[1]) && pinMatchesSpec(trace.endPin, conn[0]);
+            if (fwd || rev) return 'correct';
+        }
+        return 'wrong';
+    }
+
+    // Reclassify every trace (called when board state changes)
+    function reclassifyAllTraces() {
+        traces.forEach(t => { t.status = classifyTrace(t); });
+    }
+
+    // Check if a specific pin is part of any completed connection
+    function getPinStatus(compIdx, pinIdx) {
+        const comp = placedComponents[compIdx];
+        if (!comp) return 'unused';
+        const ch = challenges[currentChallenge];
+        if (!ch) return 'unused';
+        const spec = comp.type + ':' + pinIdx;
+        // Is this pin in a completed connection?
+        for (const conn of ch.connections) {
+            if ((conn[0] === spec || conn[1] === spec) && isConnectionMade(conn)) return 'connected';
+        }
+        // Is this pin the next hint target?
+        const hint = getNextHintConnection();
+        if (hint && (hint.conn[0] === spec || hint.conn[1] === spec)) return 'next';
+        // Is this pin part of any required connection?
+        for (const conn of ch.connections) {
+            if (conn[0] === spec || conn[1] === spec) return 'pending';
+        }
+        return 'unused';
+    }
+
+    // Human-readable pin label
+    function humanPinLabel(spec) {
+        const [type, idx] = spec.split(':');
+        const labels = PIN_LABELS[type];
+        const compName = COMPONENT_TYPES[type]?.name || type;
+        const pinName = labels ? labels[parseInt(idx)] : `pin ${idx}`;
+        return `${compName} (${pinName})`;
     }
 
     // Find the first required connection that hasn't been made yet,
@@ -663,6 +724,9 @@ const pcbGame = (() => {
             if (pBtn) pBtn.classList.remove('btn-pulse');
             draw();
         }
+
+        // Reclassify traces when board state changes (e.g. component deleted)
+        reclassifyAllTraces();
     }
 
     function powerOn() {
@@ -724,12 +788,54 @@ const pcbGame = (() => {
         // Grid
         drawGrid(ctx, w, h, GRID, 'rgba(0, 100, 50, 0.3)');
 
-        // Draw traces
+        // Wire progress badge (top-left corner)
+        if (!powered && placedComponents.length > 0) {
+            const ch = challenges[currentChallenge];
+            const correctCount = ch.connections.filter(isConnectionMade).length;
+            const totalCount = ch.connections.length;
+            const wrongCount = traces.filter(t => t.status === 'wrong').length;
+            const badgeW = wrongCount > 0 ? 170 : 110;
+            ctx.fillStyle = 'rgba(10, 15, 25, 0.85)';
+            roundRect(ctx, 8, 8, badgeW, 24, 6);
+            ctx.fill();
+            ctx.strokeStyle = correctCount === totalCount ? 'rgba(62,207,113,0.6)' : 'rgba(100,120,150,0.3)';
+            ctx.lineWidth = 1;
+            roundRect(ctx, 8, 8, badgeW, 24, 6);
+            ctx.stroke();
+            ctx.font = '11px "JetBrains Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = correctCount === totalCount ? '#4ade80' : '#c8d0dc';
+            ctx.fillText(`Wires: ${correctCount}/${totalCount}`, 16, 20);
+            if (wrongCount > 0) {
+                ctx.fillStyle = '#f87171';
+                ctx.fillText(` · ${wrongCount} wrong`, 85, 20);
+            }
+        }
+
+        // Draw traces — color-coded by status
+        const hasWrongTrace = traces.some(t => t.status === 'wrong');
         traces.forEach(trace => {
-            ctx.strokeStyle = powered ? '#ff9100' : '#00b4d8';
-            ctx.lineWidth = 3;
+            const status = trace.status || 'wrong';
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
+
+            if (powered) {
+                ctx.strokeStyle = '#ff9100';
+                ctx.globalAlpha = 1;
+                ctx.lineWidth = 3;
+            } else if (status === 'correct') {
+                ctx.strokeStyle = '#4ade80';     // green — correct wire
+                ctx.globalAlpha = 0.4;           // dim completed wires so active area is clear
+                ctx.lineWidth = 2.5;
+            } else {
+                // Wrong wire — red, pulsing glow
+                const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 250);
+                ctx.strokeStyle = `rgba(248, 113, 113, ${pulse})`;
+                ctx.globalAlpha = 1;
+                ctx.lineWidth = 3;
+            }
+
             ctx.beginPath();
             trace.points.forEach((p, i) => {
                 if (i === 0) ctx.moveTo(p.x, p.y);
@@ -737,13 +843,34 @@ const pcbGame = (() => {
             });
             ctx.stroke();
 
-            // Glow
+            // Glow for wrong traces (red halo) or powered (orange halo)
             if (powered) {
                 ctx.strokeStyle = 'rgba(255, 145, 0, 0.3)';
                 ctx.lineWidth = 8;
+                ctx.globalAlpha = 1;
                 ctx.stroke();
+            } else if (status === 'wrong') {
+                ctx.strokeStyle = 'rgba(248, 113, 113, 0.2)';
+                ctx.lineWidth = 10;
+                ctx.stroke();
+                // Small "✗" at the midpoint of wrong traces
+                const mid = trace.points[Math.floor(trace.points.length / 2)];
+                ctx.fillStyle = 'rgba(248, 113, 113, 0.9)';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('✗', mid.x, mid.y - 10);
             }
+            ctx.globalAlpha = 1;
         });
+
+        // Keep animating if wrong traces exist (for pulse effect)
+        if (hasWrongTrace && !draw._wrongAnim) {
+            draw._wrongAnim = true;
+            requestAnimationFrame(() => {
+                draw._wrongAnim = false;
+                if (traces.some(t => t.status === 'wrong')) draw();
+            });
+        }
 
         // In-progress trace
         if (traceStart && tracePoints.length > 0) {
@@ -874,7 +1001,7 @@ const pcbGame = (() => {
                     ctx.stroke();
                 });
                 // Label — positioned in empty space so it never overlaps any component
-                const label = 'HINT: connect ' + hint.conn[0] + ' \u2194 ' + hint.conn[1];
+                const label = 'NEXT: ' + humanPinLabel(hint.conn[0]) + ' → ' + humanPinLabel(hint.conn[1]);
                 ctx.font = 'bold 11px Inter, sans-serif';
                 const tw = ctx.measureText(label).width;
                 const lw = tw + 12, lh = 18;
@@ -1053,13 +1180,58 @@ const pcbGame = (() => {
         }
         ctx.restore();
 
-        // Pins (always drawn same way)
-        comp.pins.forEach(pin => {
+        // Pins — color-coded by connection status, with labels
+        const compIdx = placedComponents.indexOf(comp);
+        const labels = PIN_LABELS[comp.type] || [];
+        comp.pins.forEach((pin, pi) => {
+            const pStatus = powered ? 'powered' : getPinStatus(compIdx, pi);
+            let fillColor = '#00e676';     // default green
+            let strokeColor = '#fff';
+            let radius = 4;
+            if (powered) {
+                fillColor = '#ff9100';
+            } else if (pStatus === 'connected') {
+                fillColor = '#4ade80';
+                strokeColor = 'rgba(255,255,255,0.4)';
+                radius = 3;  // smaller when done
+            } else if (pStatus === 'next') {
+                fillColor = '#ffd600';
+                strokeColor = '#ffd600';
+                radius = 5;
+            } else if (pStatus === 'pending') {
+                fillColor = '#60a5fa';    // blue for pending
+                strokeColor = '#fff';
+            } else {
+                fillColor = '#555';        // dim for unused
+                strokeColor = 'rgba(255,255,255,0.3)';
+                radius = 3;
+            }
             ctx.beginPath();
-            ctx.arc(pin.x, pin.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = powered ? '#ff9100' : '#00e676';
+            ctx.arc(pin.x, pin.y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = fillColor;
             ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.strokeStyle = strokeColor; ctx.lineWidth = 1; ctx.stroke();
+
+            // Pin label (e.g. V+, GND, A+, K-)
+            if (labels[pi] && !powered) {
+                const lbl = labels[pi];
+                ctx.font = 'bold 7px "JetBrains Mono", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Position label outward from component center
+                const ccx = comp.x + comp.w / 2, ccy = comp.y + comp.h / 2;
+                const dx = pin.x - ccx, dy = pin.y - ccy;
+                const dist = Math.max(Math.hypot(dx, dy), 1);
+                const ox = (dx / dist) * 14;
+                const oy = (dy / dist) * 14;
+                // Background pill for readability
+                const tw = ctx.measureText(lbl).width;
+                ctx.fillStyle = 'rgba(10, 15, 25, 0.8)';
+                roundRect(ctx, pin.x + ox - tw / 2 - 3, pin.y + oy - 6, tw + 6, 12, 3);
+                ctx.fill();
+                ctx.fillStyle = pStatus === 'next' ? '#ffd600' : pStatus === 'connected' ? '#4ade80' : '#c8d0dc';
+                ctx.fillText(lbl, pin.x + ox, pin.y + oy);
+            }
         });
 
         // LED power glow
