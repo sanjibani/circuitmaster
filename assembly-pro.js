@@ -1137,12 +1137,18 @@ const assemblyPro = (() => {
             specEl.textContent = `${f.target.toFixed(2)} Nm ± ${f.tol.toFixed(2)}`;
             roundEl.textContent = `${idx + 1} / ${fasteners.length}`;
             hintEl.textContent = f.hint;
-            slider.value = (f.min + 0.2).toFixed(2);
-            curEl.textContent = `${(+slider.value).toFixed(2)} Nm`;
-            lockVal.textContent = (+slider.value).toFixed(2);
+            // Reset per-fastener attempt counter (critical — without this, leftover
+            // tries from the previous fastener cause instant skip on first click)
             tries = 0;
+            // Start the slider near the target ± a random offset so the user has
+            // to fine-tune, but it's already in the right neighbourhood
+            const startOffset = (Math.random() - 0.5) * 0.6;
+            const startVal = Math.max(f.min, Math.min(f.max, f.target + startOffset));
+            slider.value = startVal.toFixed(2);
+            curEl.textContent = `${startVal.toFixed(2)} Nm`;
+            lockVal.textContent = startVal.toFixed(2);
             lockBtn.disabled = false;
-            animateTo(+slider.value, f);
+            animateTo(startVal, f);
         }
 
         slider.addEventListener('input', () => {
